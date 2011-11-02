@@ -17,7 +17,9 @@
   (.readLine rdr))
 
 (defmethod response \* [rdr]
-  (throw (UnsupportedOperationException. "Not Implemented")))
+  (let [length (Integer/parseInt (.readLine rdr))
+        resp (repeatedly (* 2 length) (fn [] (conj [] (.readLine rdr))))]
+    (mapcat second (partition 2 resp))))
 
 (defn command [name & args]
   (str "*"
