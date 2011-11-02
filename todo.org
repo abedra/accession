@@ -1,0 +1,12 @@
+#+TODO: TODO IN-PROGRESS REVIEW DONE
+* Response Processing
+** TODO Return proper values for ints, true, and false
+* API
+** TODO Create a macro that allows for command creation
+*** See redis-clojure as an example https://github.com/ragnard/redis-clojure/blob/master/src/redis.clj#L75
+** TODO Create a representation of every command offered in redis
+* Tests
+** TODO Create a regression suite out of the currently commented code
+*** This is just a representation of the tutorial offered on the redis site
+** TODO Create a small test for each of the redis commands to demonstrate that they work as expected
+*** This might be difficult for things like TTL
