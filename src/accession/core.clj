@@ -66,7 +66,6 @@
   (send-command (command "rpush" "friends" "Bob"))
   (send-command (command "lpush" "friends" "Sam"))
 
-  ; TODO
   (send-command (command "lrange" "friends" "0" "-1"))
   (send-command (command "lrange" "friends" "0" "1"))
   (send-command (command "lrange" "friends" "0" "2"))
@@ -75,7 +74,6 @@
   (send-command (command "lpop" "friends"))
   (send-command (command "rpop" "friends"))
   (send-command (command "llen" "friends"))
-  ; TODO
   (send-command (command "lrange" "friends" "0" "-1"))
 
   (send-command (command "sadd" "superpowers" "flight"))
@@ -86,7 +84,6 @@
   (send-command (command "sismember" "superpowers" "reflexes"))
   (send-command (command "sadd" "birdpowers" "pecking"))
   (send-command (command "sadd" "birdpowers" "flight"))
-  ; TODO
   (send-command (command "sunion" "superpowers" "birdpowers"))
 
   (send-command (command "zadd" "hackers" "1940" "Alan Kay"))
@@ -95,6 +92,5 @@
   (send-command (command "zadd" "hackers" "1916" "Claude Shannon"))
   (send-command (command "zadd" "hackers" "1969" "Linus Torvalds"))
   (send-command (command "zadd" "hackers" "1912" "Alan Turning"))
-  ; TODO
   (send-command (command "zrange" "hackers" "2" "4"))
 )
