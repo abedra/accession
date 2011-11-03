@@ -23,7 +23,9 @@
   (is (= "OK" (redis/set "server:name" "fido")))
   (is (= "fido" (redis/get "server:name")))
   (is (= "15" (redis/append "server:name" " [shutdown]")))
-  (is (= "fido [shutdown]" (redis/getset "server:name" "fido [running]"))))
+  (is (= "fido [shutdown]" (redis/getset "server:name" "fido [running]")))
+  (is (= "OK" (redis/set "multiline" "Redis\r\nDemo")))
+  (is (= "Redis\r\nDemo" (redis/get "multiline"))))
 
 (deftest test-incr
   (redis/set "connections" "10")

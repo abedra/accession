@@ -24,16 +24,16 @@
   (.readLine rdr))
 
 (defmethod response \$ [rdr]
-  (.readLine rdr)
-  (.readLine rdr))
+  (let [length (Integer/parseInt (.readLine rdr))]
+    (when (not= length -1)
+      (apply str (map char (take length (doall (repeatedly (+ 2 length) #(.read rdr)))))))))
 
 (defmethod response \: [rdr]
   (.readLine rdr))
 
 (defmethod response \* [rdr]
-  (let [length (Integer/parseInt (.readLine rdr))
-        resp (repeatedly (* 2 length) (fn [] (conj [] (.readLine rdr))))]
-    (mapcat second (partition 2 resp))))
+  (let [length (Integer/parseInt (.readLine rdr))]
+    (doall (repeatedly length #(response rdr)))))
 
 (defn query
   "The new unified protocol was introduced in Redis 1.2, but it became
