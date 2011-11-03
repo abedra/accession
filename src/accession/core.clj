@@ -5,7 +5,17 @@
   (:import (java.net Socket)
            (java.io InputStreamReader)))
 
-(defmulti response (fn [r] (char (.read r))))
+(defmulti response
+  "Redis will reply to commands with different kinds of replies. It is
+  possible to check the kind of reply from the first byte sent by the
+  server:
+
+  * With a single line reply the first byte of the reply will be \"+\"
+  * With an error message the first byte of the reply will be \"-\"
+  * With an integer number the first byte of the reply will be \":\"
+  * With bulk reply the first byte of the reply will be \"$\"
+  * With multi-bulk reply the first byte of the reply will be \"*\""
+  (fn [r] (char (.read r))))
 
 (defmethod response \- [rdr]
   (.readLine rdr))
@@ -25,7 +35,34 @@
         resp (repeatedly (* 2 length) (fn [] (conj [] (.readLine rdr))))]
     (mapcat second (partition 2 resp))))
 
-(defn query [name & args]
+(defn query
+  "The new unified protocol was introduced in Redis 1.2, but it became
+   the standard way for talking with the Redis server in Redis 2.0.
+   In the unified protocol all the arguments sent to the Redis server
+   are binary safe. This is the general form:
+
+   *<number of arguments> CR LF
+   $<number of bytes of argument 1> CR LF
+   <argument data> CR LF
+   ...
+   $<number of bytes of argument N> CR LF
+   <argument data> CR LF
+
+   See the following example:
+
+   *3
+   $3
+   SET
+   $5
+   mykey
+   $7
+   myvalue
+
+   This is how the above command looks as a quoted string, so that it
+   is possible to see the exact value of every byte in the query:
+
+   \"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n\""
+  [name & args]
   (str "*"
        (+ 1 (count args)) "\r\n"
        "$" (count name) "\r\n"
@@ -37,7 +74,10 @@
                   args))
        "\r\n"))
 
-(defn request [cmd]
+(defn request
+  "Creates the connection to the sever and sends the query. Parses and
+  returns the response"
+  [cmd]
   (let [socket (doto (Socket. "127.0.0.1" 6379)
                  (.setTcpNoDelay true)
                  (.setKeepAlive true))
