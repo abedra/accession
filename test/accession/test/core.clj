@@ -2,17 +2,33 @@
   (:use clojure.test)
   (:require [accession.core :as redis]))
 
+(redis/flushall)
+
 (deftest test-command-construction
   (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (redis/query "set" "foo" "bar")))
   (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (redis/query "get" "bar"))))
 
+(deftest test-echo
+  (is (= "Message" (redis/echo "Message"))))
+
+(deftest test-exists
+  (is (= "0" (redis/exists "singularity")))
+  (redis/set "singularity" "exists")
+  (is (= "1" (redis/exists "singularity"))))
+
+(deftest test-keys
+  (is (= (quote ("resource:lock" "singularity")) (redis/keys "*"))))
+
 (deftest test-set-and-get
   (is (= "OK" (redis/set "server:name" "fido")))
-  (is (= "fido" (redis/get "server:name"))))
+  (is (= "fido" (redis/get "server:name")))
+  (is (= "15" (redis/append "server:name" " [shutdown]")))
+  (is (= "fido [shutdown]" (redis/getset "server:name" "fido [running]"))))
 
 (deftest test-incr
   (redis/set "connections" "10")
-  (is (= "11" (redis/incr "connections"))))
+  (is (= "11" (redis/incr "connections")))
+  (is (= "20" (redis/incrby "connections" "9"))))
 
 (deftest test-del
   ;; This works, but ideally should return true, not "1"
@@ -42,6 +58,21 @@
   (is (= "Tom")) (redis/lrange "friends" "0" "-1")
   (redis/del "friends"))
 
+(deftest test-hashes
+  (redis/hset "myhash" "field1" "value1")
+  (is (= "value1" (redis/hget "myhash" "field1")))
+  (redis/hsetnx "myhash" "field1" "newvalue")
+  (is (= "value1" (redis/hget "myhash" "field1")))
+  (is (= "1" (redis/hexists "myhash" "field1")))
+  (is (= (quote ("field1" "value1")) (redis/hgetall "myhash")))
+  (redis/hset "myhash" "field2" "1")
+  (is (= "3" (redis/hincrby "myhash" "field2" "2")))
+  (is (= (quote ("field1" "field2")) (redis/hkeys "myhash")))
+  (is (= (quote ("value1" "3")) (redis/hvals "myhash")))
+  (is (= "2" (redis/hlen "myhash")))
+  (redis/hdel "myhash" "field1")
+  (is (= "0" (redis/hexists "myhash" "field1"))))
+
 (deftest test-sets
   (redis/sadd "superpowers" "flight")
   (redis/sadd "superpowers" "x-ray vision")
@@ -63,3 +94,10 @@
   (redis/zadd "hackers" "1912" "Alan Turning")
   (is (= (quote ("Alan Kay" "Richard Stallman" "Yukihiro Matsumoto"))
          (redis/zrange "hackers" "2" "4"))))
+
+(deftest test-dbsize
+  (redis/flushdb)
+  (redis/set "something" "with a value")
+  (is (= "1" (redis/dbsize)))
+  (redis/flushall)
+  (is (= "0" (redis/dbsize))))

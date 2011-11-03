@@ -1,5 +1,5 @@
 (ns accession.core
-  (:refer-clojure :exclude [get set])
+  (:refer-clojure :exclude [get set keys])
   (:require [clojure.string :as str]
             [clojure.java.io :as io])
   (:import (java.net Socket)
@@ -98,26 +98,55 @@
   `(do ~@(map (fn [q] `(defquery ~@q)) queries)))
 
 (defqueries
+  (echo        [message])
+  (exists      [key])
+  (keys        [pattern])
+  
   (set         [key value])
   (get         [key])
+  (append      [key value])
+  (getset      [key value])
 
   (incr        [key])
+  (incrby      [key increment])
 
   (del         [key])
   (expire      [key seconds])
   (ttl         [key])
 
-  (rpush       [key value])
-  (lpush       [key value])
   (llen        [key])
-  (lrange      [key start end])
   (lpop        [key])
+  (lpush       [key value])
+  (lpushx      [key value])
+  (lset        [key value index])
+  (lrem        [key count value])
+  (ltrim       [key start stop])
+  (lrange      [key start end])
   (rpop        [key])
+  (rpush       [key value])
+  (rpushx      [key value])
+  (rpoplpush   [source destination])
 
+  (hset        [key field value])
+  (hsetnx      [key field value])
+  (hget        [key field])
+  (hexists     [key field])
+  (hdel        [key field])
+  (hgetall     [key])
+  (hincrby     [key field increment])
+  (hkeys       [key])
+  (hvals       [key])
+  (hlen        [key])
+  
   (sadd        [key member])
   (srem        [key member])
   (sismember   [key member])
   (sunion      [set1 set2])
 
   (zadd        [key score member])
-  (zrange      [key start end]))
+  (zrange      [key start end])
+
+  (flushdb     [])
+  (flushall    [])
+  (dbsize      [])
+  (info        []))
