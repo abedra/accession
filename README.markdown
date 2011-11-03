@@ -16,10 +16,10 @@ A Clojure library for redis
     (redis/get "foo")
     -> "some value"
 
-    This library is targeted at Redis 2.0+. If you are using an older
-    version of Redis or are using a version of Clojure earlier than
-    1.3.0, you may have better luck with
-    [redis-clojure](https://github.com/ragnard/redis-clojure). 
+This library is targeted at Redis 2.0+. If you are using an older
+version of Redis or are using a version of Clojure earlier than 1.3.0,
+you may have better luck with
+[redis-clojure](https://github.com/ragnard/redis-clojure).
 
 ## License
 
