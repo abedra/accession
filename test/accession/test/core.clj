@@ -109,3 +109,5 @@
   (is (= "1" (redis/dbsize)))
   (redis/flushall)
   (is (= "0" (redis/dbsize))))
+
+(redis/flushall)
