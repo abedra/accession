@@ -98,20 +98,32 @@
   `(do ~@(map (fn [q] `(defquery ~@q)) queries)))
 
 (defqueries
+  ;; (auth     [password])
+  ;; (debug-object [key])
+  ;; (debug-segfault)
+
   (echo        [message])
   (exists      [key])
+  ;; (discard  [])
+  ;; (exec     [])
   (keys        [pattern])
   
   (set         [key value])
   (get         [key])
   (append      [key value])
   (getset      [key value])
+  (setbit      [key offset value])
+  (getbit      [key offset])
+  (getrange    [key start end])
+  (del         [key])
 
   (incr        [key])
   (incrby      [key increment])
+  (decr        [key])
+  (decrby      [key increment])
 
-  (del         [key])
   (expire      [key seconds])
+  (expireat    [key seconds])
   (ttl         [key])
 
   (llen        [key])
@@ -126,6 +138,9 @@
   (rpush       [key value])
   (rpushx      [key value])
   (rpoplpush   [source destination])
+  ;; (blpop    [key timeout])
+  ;; (brpop    [key timeout])
+  ;; (brpoplpush [source destination timeout])
 
   (hset        [key field value])
   (hsetnx      [key field value])
@@ -146,7 +161,14 @@
   (zadd        [key score member])
   (zrange      [key start end])
 
+  ;; (bgwriteaof [])
+  ;; (bgsave     [])
+  
   (flushdb     [])
   (flushall    [])
   (dbsize      [])
-  (info        []))
+  (info        [])
+  ;; (config-get [parameter])
+  ;; (config-set [parameter value])
+  ;; (config-resetstat [])
+)

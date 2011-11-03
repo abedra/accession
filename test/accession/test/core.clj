@@ -19,18 +19,23 @@
 (deftest test-keys
   (is (= (quote ("resource:lock" "singularity")) (redis/keys "*"))))
 
-(deftest test-set-and-get
+(deftest test-set-get
   (is (= "OK" (redis/set "server:name" "fido")))
   (is (= "fido" (redis/get "server:name")))
   (is (= "15" (redis/append "server:name" " [shutdown]")))
   (is (= "fido [shutdown]" (redis/getset "server:name" "fido [running]")))
+  (is (= "running" (redis/getrange "server:name" "6" "12")))
+  (redis/setbit "mykey" "7" "1")
+  (is (= "1" (redis/getbit "mykey" "7")))
   (is (= "OK" (redis/set "multiline" "Redis\r\nDemo")))
   (is (= "Redis\r\nDemo" (redis/get "multiline"))))
 
-(deftest test-incr
+(deftest test-incr-decr
   (redis/set "connections" "10")
   (is (= "11" (redis/incr "connections")))
-  (is (= "20" (redis/incrby "connections" "9"))))
+  (is (= "20" (redis/incrby "connections" "9")))
+  (is (= "19" (redis/decr "connections")))
+  (is (= "10" (redis/decrby "connections" "9"))))
 
 (deftest test-del
   ;; This works, but ideally should return true, not "1"
