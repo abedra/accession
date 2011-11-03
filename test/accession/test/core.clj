@@ -9,7 +9,8 @@
   (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (redis/query "get" "bar"))))
 
 (deftest test-echo
-  (is (= "Message" (redis/echo "Message"))))
+  (is (= "Message" (redis/echo "Message")))
+  (is (= "PONG" (redis/ping))))
 
 (deftest test-exists
   (is (= "0" (redis/exists "singularity")))

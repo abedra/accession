@@ -3,11 +3,7 @@
 ** TODO Return proper values for ints, true, and false
 * API
 ** REVIEW Create a macro that allows for command creation
-*** See redis-clojure as an example https://github.com/ragnard/redis-clojure/blob/master/src/redis.clj#L75
+*** Commands with varargs don't work
 ** IN-PROGRESS Create a representation of every command offered in redis
 * Tests
-** DONE Create a regression suite out of the currently commented code
-   CLOSED: [2011-11-02 Wed 18:24]
-*** This is just a representation of the tutorial offered on the redis site
-** TODO Create a small test for each of the redis commands to demonstrate that they work as expected
-*** This might be difficult for things like TTL
+** IN-PROGRESS Create a small test for each of the redis commands to demonstrate that they work as expected
