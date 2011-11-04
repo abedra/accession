@@ -25,6 +25,7 @@ you may have better luck with
 ## Contributors
 
 [Brenton Ashworth](http://github.com/brentonashworth)
+
 [Michael Fogus](http://github.com/fogus)
 
 ## License
