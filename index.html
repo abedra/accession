@@ -2526,91 +2526,43 @@ $(document).ready(function() {
     ul.css('margin-top', '0px')
 
 })
-</script><title>accession -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">accession</h1><h2 class="project-version">0.0.1-SNAPSHOT</h2><br /><p>A Clojure library for Redis</p>
-</div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.4.0-alpha1</td></tr></table></div><div class="dependencies"><h3>dev dependencies</h3><table><tr><td class="dep-name">swank-clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.3.0</td></tr><tr><td class="dep-name">marginalia</td><td class="dotted"><hr /></td><td class="dep-version">0.7.0-SNAPSHOT</td></tr><tr><td class="dep-name">lein-marginalia</td><td class="dotted"><hr /></td><td class="dep-version">0.6.1</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#accession.core">accession.core</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.core" name="accession.core"><h1 class="project-name">accession.core</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</script><title>accession -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">accession</h1><h2 class="project-version">0.0.1</h2><br /><p>A Clojure library for Redis</p>
+</div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.4.0-alpha1</td></tr></table></div><div class="dependencies"><h3>dev dependencies</h3><table><tr><td class="dep-name">swank-clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.3.0</td></tr><tr><td class="dep-name">marginalia</td><td class="dotted"><hr /></td><td class="dep-version">0.7.0-SNAPSHOT</td></tr><tr><td class="dep-name">lein-marginalia</td><td class="dotted"><hr /></td><td class="dep-version">0.6.1</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#accession.connection">accession.connection</a></li><li><a href="#accession.core">accession.core</a></li><li><a href="#accession.protocol">accession.protocol</a></li><li><a href="#accession.request">accession.request</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.connection" name="accession.connection"><h1 class="project-name">accession.connection</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(ns accession.connection
+  (:import (java.net Socket)))</pre></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(defn connection [spec]
+  (let [default {:host &quot;127.0.0.1&quot;
+                 :port 6379
+                 :password nil
+                 :socket nil}
+        params (merge default spec)]
+    (assoc params :socket (doto (Socket. (:host params) (:port params))
+                            (.setTcpNoDelay true)
+                            (.setKeepAlive true)))))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.core" name="accession.core"><h1 class="project-name">accession.core</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes" /><pre class="brush: clojure">(ns accession.core
   (:refer-clojure :exclude [get set keys type sync])
-  (:require [clojure.string :as str]
-            [clojure.java.io :as io])
-  (:import (java.net Socket)
-           (java.io InputStreamReader)))</pre></tr><tr><td class="docs"><p>Redis will reply to commands with different kinds of replies. It is
-  possible to check the kind of reply from the first byte sent by the
-  server:</p>
+  (:use [accession.protocol :only (query)]
+        [accession.request :only (request)]
+        [accession.connection :only (connection)]))</pre></tr><tr><td class="docs"><p>Creates a socket with the given connection info in the form of:</p>
 
-<ul>
-<li>With a single line reply the first byte of the reply will be <code>+</code></li>
-<li>With an error message the first byte of the reply will be <code>-</code></li>
-<li>With an integer number the first byte of the reply will be <code>:</code></li>
-<li>With bulk reply the first byte of the reply will be <code>$</code></li>
-<li>With multi-bulk reply the first byte of the reply will be <code>*</code></li>
-</ul>
-</td><td class="codes" /><pre class="brush: clojure">(defmulti response
-  (fn [r] (char (.read r))))</pre></tr><tr><td class="docs">
-</td><td class="codes" /><pre class="brush: clojure">(defmethod response \- [rdr]
-  (.readLine rdr))</pre></tr><tr><td class="docs">
-</td><td class="codes" /><pre class="brush: clojure">(defmethod response \+ [rdr]
-  (.readLine rdr))</pre></tr><tr><td class="docs">
-</td><td class="codes" /><pre class="brush: clojure">(defmethod response \$ [rdr]
-  (let [length (Integer/parseInt (.readLine rdr))]
-    (when (not= length -1)
-      (apply str (map char (take length (doall (repeatedly (+ 2 length) #(.read rdr)))))))))</pre></tr><tr><td class="docs">
-</td><td class="codes" /><pre class="brush: clojure">(defmethod response \: [rdr]
-  (.readLine rdr))</pre></tr><tr><td class="docs">
-</td><td class="codes" /><pre class="brush: clojure">(defmethod response \* [rdr]
-  (let [length (Integer/parseInt (.readLine rdr))]
-    (doall (repeatedly length #(response rdr)))))</pre></tr><tr><td class="docs"><p>The new <a href="http://redis.io/topics/protocol">unified protocol</a> was introduced in Redis 1.2, but it became
-  the standard way for talking with the Redis server in Redis 2.0.
-  In the unified protocol all the arguments sent to the Redis server
-  are binary safe. This is the general form:</p>
-
-<pre><code>  *&lt;number of arguments&gt; CR LF
-  $&lt;number of bytes of argument 1&gt; CR LF
-  &lt;argument data&gt; CR LF
-  ...
-  $&lt;number of bytes of argument N&gt; CR LF
-  &lt;argument data&gt; CR LF
+<pre><code>   {:host hostname
+    :port portnumber
+    :password password}
 </code></pre>
 
-<p>  See the following example:</p>
-
-<pre><code>  *3
-  $3
-  SET
-  $5
-  mykey
-  $7
-  myvalue
-</code></pre>
-
-<p>  This is how the above command looks as a quoted string, so that it
-  is possible to see the exact value of every byte in the query:</p>
-</td><td class="codes" /><pre class="brush: clojure">(defn query
-  [name &amp; args]
-  (str &quot;*&quot;
-       (+ 1 (count args)) &quot;\r\n&quot;
-       &quot;$&quot; (count name) &quot;\r\n&quot;
-       (str/upper-case name) &quot;\r\n&quot;
-       (str/join &quot;\r\n&quot;
-                 (map (fn [a] (str &quot;$&quot; (count a) &quot;\r\n&quot; a))
-                      args))
-       &quot;\r\n&quot;))</pre></tr><tr><td class="docs"><pre>"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n"</pre>
-</td><td class="codes" /></tr><tr><td class="docs"><p>Creates the connection to the sever and sends the query. Parses and
-  returns the response.</p>
-</td><td class="codes" /><pre class="brush: clojure">(defn request
-  [cmd]
-  (let [socket (doto (Socket. &quot;127.0.0.1&quot; 6379)
-                 (.setTcpNoDelay true)
-                 (.setKeepAlive true))
-        in (.getInputStream socket)
-        out (.getOutputStream socket)
-        rdr (io/reader (InputStreamReader. in))]
-    (.write out (.getBytes cmd))
-    (response rdr)))</pre></tr><tr><td class="docs">
+<p>   If an empty map is provided, localhost defaults will be used</p>
+</td><td class="codes" /><pre class="brush: clojure">(defmacro defconnection
+  [spec]
+  `(connection ~spec))</pre></tr><tr><td class="docs"><p>Responsible for calling the request function and providing the
+  connection details</p>
+</td><td class="codes" /><pre class="brush: clojure">(defmacro with-connection
+  [connection &amp; body]
+  `(request ~connection ~@body))</pre></tr><tr><td class="docs">
 </td><td class="codes" /><pre class="brush: clojure">(defmacro defquery
   [name params]
   (let [command (str name)]
     `(defn ~name ~params
-       (request (query ~command ~@params)))))</pre></tr><tr><td class="docs">
+       (query ~command ~@params))))</pre></tr><tr><td class="docs">
 </td><td class="codes" /><pre class="brush: clojure">(defmacro defqueries
   [&amp; queries]
   `(do ~@(map (fn [q] `(defquery ~@q)) queries)))</pre></tr><tr><td class="docs">
@@ -2749,5 +2701,83 @@ $(document).ready(function() {
   (subscribe        [channel])
   (unsubscribe      [channel])
   (punsubscribe     [pattern])
-  (psubscribe       [pattern]))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a><div id="floating-toc"><ul><li class="floating-toc-li" id="floating-toc_accession.core">accession.core</li></ul></div></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+  (psubscribe       [pattern]))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.protocol" name="accession.protocol"><h1 class="project-name">accession.protocol</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(ns accession.protocol
+  (:require [clojure.string :as str]))</pre></tr><tr><td class="docs"><p>The new <a href="http://redis.io/topics/protocol">unified protocol</a> was introduced in Redis 1.2, but it became
+  the standard way for talking with the Redis server in Redis 2.0.
+  In the unified protocol all the arguments sent to the Redis server
+  are binary safe. This is the general form:</p>
+
+<pre><code>  *&lt;number of arguments&gt; CR LF
+  $&lt;number of bytes of argument 1&gt; CR LF
+  &lt;argument data&gt; CR LF
+  ...
+  $&lt;number of bytes of argument N&gt; CR LF
+  &lt;argument data&gt; CR LF
+</code></pre>
+
+<p>  See the following example:</p>
+
+<pre><code>  *3
+  $3
+  SET
+  $5
+  mykey
+  $7
+  myvalue
+</code></pre>
+
+<p>  This is how the above command looks as a quoted string, so that it
+  is possible to see the exact value of every byte in the query:</p>
+</td><td class="codes" /><pre class="brush: clojure">(defn query
+  [name &amp; args]
+  (str &quot;*&quot;
+       (+ 1 (count args)) &quot;\r\n&quot;
+       &quot;$&quot; (count name) &quot;\r\n&quot;
+       (str/upper-case name) &quot;\r\n&quot;
+       (str/join &quot;\r\n&quot;
+                 (map (fn [a] (str &quot;$&quot; (count a) &quot;\r\n&quot; a))
+                      args))
+       &quot;\r\n&quot;))</pre></tr><tr><td class="docs"><pre>"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n"</pre>
+</td><td class="codes" /></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.request" name="accession.request"><h1 class="project-name">accession.request</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(ns accession.request
+  (:require [clojure.java.io :as io])
+  (:import (java.net Socket)
+           (java.io InputStreamReader)))</pre></tr><tr><td class="docs"><p>Redis will reply to commands with different kinds of replies. It is
+  possible to check the kind of reply from the first byte sent by the
+  server:</p>
+
+<ul>
+<li>With a single line reply the first byte of the reply will be <code>+</code></li>
+<li>With an error message the first byte of the reply will be <code>-</code></li>
+<li>With an integer number the first byte of the reply will be <code>:</code></li>
+<li>With bulk reply the first byte of the reply will be <code>$</code></li>
+<li>With multi-bulk reply the first byte of the reply will be <code>*</code></li>
+</ul>
+</td><td class="codes" /><pre class="brush: clojure">(defmulti response
+  (fn [r] (char (.read r))))</pre></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(defmethod response \- [rdr]
+  (.readLine rdr))</pre></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(defmethod response \+ [rdr]
+  (.readLine rdr))</pre></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(defmethod response \$ [rdr]
+  (let [length (Integer/parseInt (.readLine rdr))]
+    (when (not= length -1)
+      (apply str (map char (take length (doall (repeatedly (+ 2 length) #(.read rdr)))))))))</pre></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(defmethod response \: [rdr]
+  (.readLine rdr))</pre></tr><tr><td class="docs">
+</td><td class="codes" /><pre class="brush: clojure">(defmethod response \* [rdr]
+  (let [length (Integer/parseInt (.readLine rdr))]
+    (doall (repeatedly length #(response rdr)))))</pre></tr><tr><td class="docs"><p>Creates the connection to the sever and sends the query. Parses and
+  returns the response.</p>
+</td><td class="codes" /><pre class="brush: clojure">(defn request
+  [connection query]
+  (let [socket (doto (Socket. &quot;127.0.0.1&quot; 6379)
+                 (.setTcpNoDelay true)
+                 (.setKeepAlive true))
+        in (.getInputStream socket)
+        out (.getOutputStream socket)
+        rdr (io/reader (InputStreamReader. in))]
+    (.write out (.getBytes query))
+    (response rdr)))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a><div id="floating-toc"><ul><li class="floating-toc-li" id="floating-toc_accession.connection">accession.connection</li><li class="floating-toc-li" id="floating-toc_accession.core">accession.core</li><li class="floating-toc-li" id="floating-toc_accession.protocol">accession.protocol</li><li class="floating-toc-li" id="floating-toc_accession.request">accession.request</li></ul></div></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
        SyntaxHighlighter.all()</script></body></html>
