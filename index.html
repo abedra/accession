@@ -2540,7 +2540,7 @@ $(document).ready(function() {
                             (.setTcpNoDelay true)
                             (.setKeepAlive true)))))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.core" name="accession.core"><h1 class="project-name">accession.core</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes" /><pre class="brush: clojure">(ns accession.core
-  (:refer-clojure :exclude [get set keys type sync])
+  (:refer-clojure :exclude [get set keys type sync sort])
   (:use [accession.protocol :only (query)]
         [accession.request :only (request)]
         [accession.connection :only (connection)]))</pre></tr><tr><td class="docs"><p>Creates a socket with the given connection info in the form of:</p>
@@ -2554,27 +2554,46 @@ $(document).ready(function() {
 </td><td class="codes" /><pre class="brush: clojure">(defmacro defconnection
   [spec]
   `(connection ~spec))</pre></tr><tr><td class="docs"><p>Responsible for calling the request function and providing the
-  connection details</p>
+   connection details. This does not need to me a macro and could
+   be implemented as:</p>
+
+<pre><code>   (apply request connection body)
+</code></pre>
+
+<p>   But applying arguments to a function is slower than a standard
+   function call. The macro implementation generates faster runtime
+   code with all of the bodies spliced in.</p>
 </td><td class="codes" /><pre class="brush: clojure">(defmacro with-connection
   [connection &amp; body]
   `(request ~connection ~@body))</pre></tr><tr><td class="docs"><p>We would like to create one function for each command which Redis
-supports. The set function would look something like this:</p>
+supports. The set function would looks something like this:</p>
 
 <p>(defn set [key value]
-(request (query "set" key value))</p>
+(query "set" key value))</p>
 
 <p>Similarly, the get function would be:</p>
 
 <p>(defn get [key]
-(request (query "get" key)))</p>
+(query "get" key))</p>
 
 <p>Because each of these functions has the same pattern, we can use a
 macro to create them and save a lot of typing.</p>
-</td><td class="codes" /></tr><tr><td class="docs"><p>Given a redis command and a parameter list, create a function of
+</td><td class="codes" /></tr><tr><td class="docs"><p>This function enables vararg style definitions in the queries. For
+  example you can say:</p>
+
+<pre><code>   (mget [key &amp; keys])
+</code></pre>
+
+<p>  and the defquery macro will properly expand out into a variable
+  argument function</p>
+</td><td class="codes" /><pre class="brush: clojure">(defn parameters
+  [params]
+  (let [[args varargs] (split-with #(not= '&amp; %)  params)]
+    (conj (vec args) (last varargs))))</pre></tr><tr><td class="docs"><p>Given a redis command and a parameter list, create a function of
    the form:</p>
 
 <pre><code>   (defn &lt;name&gt; &lt;parameter-list&gt;
-     (request (query &lt;command&gt; &lt;p1&gt; &lt;p2&gt; ... &lt;pN&gt;)))
+     (query &lt;command&gt; &lt;p1&gt; &lt;p2&gt; ... &lt;pN&gt;))
 </code></pre>
 
 <p>  The name which is passed is a symbol and is first used as a symbol
@@ -2584,28 +2603,22 @@ macro to create them and save a lot of typing.</p>
 <p>  params is a list of N symbols which represent the parameters to the
   function. We use this list as the parameter-list when we create the
   function. Each symbol in this list will be an argument to query
-  after the command. We use splicing unquote (~@) to insert these
+  after the command. We use unquote splicing (~@) to insert these
   arguments after the command string.</p>
 </td><td class="codes" /><pre class="brush: clojure">(defmacro defquery
   [name params]
-  (let [command (str name)]
+  (let [command (str name)
+        p (parameters params)]
     `(defn ~name ~params
-       (query ~command ~@params))))</pre></tr><tr><td class="docs"><p>Given any number of redis commands and argument lists, convert them
+       (apply query ~command ~@p))))</pre></tr><tr><td class="docs"><p>A call to:</p>
+
+<pre><code>(defqueries (set [key value]))</code></pre>
+
+<p>will expand to:</p>
+
+<p><pre><code>(do (defn set [key value] (query "set" key value)))</pre></code></p>
+</td><td class="codes" /></tr><tr><td class="docs"><p>Given any number of redis commands and argument lists, convert them
    to function definitions.</p>
-
-<p>   A call to:</p>
-
-<pre><code>   (defqueries (set [key value]) (get [key]))
-</code></pre>
-
-<p>   will expand to:</p>
-
-<pre><code>   (do
-     (defn set [key value]
-       (request (query "set" key value)))
-     (defn get [key]
-       (request (query "get" key))))
-</code></pre>
 
 <p>   This is an interesting use of unquote splicing. Unquote splicing
    works on a sequence and that sequence can be the result of a
@@ -2614,6 +2627,9 @@ macro to create them and save a lot of typing.</p>
    which takes each list like (set [key value]), binds it to q, and
    uses unquote splicing again to create a call to defquery which
    looks like (defquery set [key value]).</p>
+
+<p>   Finally, a macro can only return a single form, so we wrap all of
+   the produced expressions in a do special form.</p>
 </td><td class="codes" /><pre class="brush: clojure">(defmacro defqueries
   [&amp; queries]
   `(do ~@(map (fn [q] `(defquery ~@q)) queries)))</pre></tr><tr><td class="docs">
@@ -2645,17 +2661,17 @@ macro to create them and save a lot of typing.</p>
   (exec             [])
   (monitor          [])
   (multi            [])
-  (object           [subcommand])
+  (object           [subcommand &amp; arguments])
   
   (set              [key value])
   (setex            [key seconds value])
   (setnx            [key value])
   (setbit           [key offset value])
-  (mset             [key value])
-  (msetnx           [key value])
+  (mset             [key value &amp; pairs])
+  (msetnx           [key value &amp; pairs])
   (setrange         [key offset value])
   (get              [key])
-  (mget             [key])
+  (mget             [key &amp; keys])
   (getbit           [key offset])
   (getset           [key value])
   (getrange         [key start end])
@@ -2668,10 +2684,10 @@ macro to create them and save a lot of typing.</p>
   (rename           [key newkey])
   (renamenx         [key newkey])
   (strlen           [key])
-  (watch            [key])
-  (unwatch          [key])
-  (del              [key])
-  ;; (sort     [])
+  (watch            [key &amp; keys])
+  (unwatch          [])
+  (del              [key &amp; keys])
+  (sort             [key &amp; options])
 
   (incr             [key])
   (incrby           [key increment])
@@ -2686,7 +2702,7 @@ macro to create them and save a lot of typing.</p>
   (llen             [key])
   (lpop             [key])
   (lpush            [key value])
-  (lpushx           [key value])
+  (lpushx           [key value &amp; values])
   (lset             [key value index])
   (linsert          [key before-after pivot value])
   (lrem             [key count value])
@@ -2694,7 +2710,7 @@ macro to create them and save a lot of typing.</p>
   (lrange           [key start end])
   (lindex           [key index])
   (rpop             [key])
-  (rpush            [key value])
+  (rpush            [key value &amp; values])
   (rpushx           [key value])
   (rpoplpush        [source destination])
   (blpop            [key timeout])
@@ -2702,57 +2718,56 @@ macro to create them and save a lot of typing.</p>
   (brpoplpush       [source destination timeout])
 
   (hset             [key field value])
-  (hmset            [key field value])
+  (hmset            [key field value &amp; pairs])
   (hsetnx           [key field value])
   (hget             [key field])
-  (hmget            [key field])
+  (hmget            [key field &amp; fields])
   (hexists          [key field])
-  (hdel             [key field])
+  (hdel             [key field &amp; fields])
   (hgetall          [key])
   (hincrby          [key field increment])
   (hkeys            [key])
   (hvals            [key])
   (hlen             [key])
   
-  (sadd             [key member])
-  (srem             [key member])
+  (sadd             [key member &amp; members])
+  (srem             [key member &amp; members])
   (sismember        [key member])
   (smembers         [key])
-  (sunion           [set1 set2])
-  (sunionstore      [destination set1 set2])
-  (sdiff            [set1 set2])
+  (sunion           [key &amp; keys])
+  (sunionstore      [destination key &amp; keys])
+  (sdiff            [key &amp; keys])
   (sdiffstore       [destination set1 set2])
-  (sinter           [set1 set2])
-  (sinterstore      [destination set1 set2])
+  (sinter           [key &amp; keys])
+  (sinterstore      [destination key &amp; keys])
   (scard            [key])
   (smove            [source desination member])
   (spop             [key])
   (srandmember      [key])
 
-  (zadd             [key score member])
+  (zadd             [key score member &amp; more])
   (zrange           [key start end])
+  (zrangebyscore    [key min max &amp; more])
+  (zrevrange        [key start stop &amp; more])
+  (zrevrangebyscore [key max min &amp; more])
   (zcard            [key])
   (zcount           [key min max])
   (zincrby          [key increment member])
   (zinterstore      [destination numkeys set1 set2])
   (zrange           [key start stop])
   (zrank            [member])
-  (zrem             [key member])
+  (zrem             [key member &amp; members])
   (zremrangebyrank  [key start stop])
   (zremrangebyscore [key min max])
   (zrevrank         [key member])
   (zcore            [key member])
   (zunionstore      [destination numkeys set1 set2])
-  ;; (zrevrange)
-  ;; (zrevrangebyscore)
-  ;; (zrange)
-  ;; (zrangebyscore)
 
   (publish          [channel message])
-  (subscribe        [channel])
-  (unsubscribe      [channel])
-  (punsubscribe     [pattern])
-  (psubscribe       [pattern]))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.protocol" name="accession.protocol"><h1 class="project-name">accession.protocol</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+  (subscribe        [channel &amp; channels])
+  (unsubscribe      [channel &amp; channels])
+  (punsubscribe     [pattern &amp; patterns])
+  (psubscribe       [pattern &amp; patterns]))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#accession.protocol" name="accession.protocol"><h1 class="project-name">accession.protocol</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes" /><pre class="brush: clojure">(ns accession.protocol
   (:require [clojure.string :as str]))</pre></tr><tr><td class="docs"><p>The new <a href="http://redis.io/topics/protocol">unified protocol</a> was introduced in Redis 1.2, but it became
   the standard way for talking with the Redis server in Redis 2.0.
@@ -2814,21 +2829,26 @@ macro to create them and save a lot of typing.</p>
 </td><td class="codes" /><pre class="brush: clojure">(defmethod response \$ [rdr]
   (let [length (Integer/parseInt (.readLine rdr))]
     (when (not= length -1)
-      (apply str (map char (take length (doall (repeatedly (+ 2 length) #(.read rdr)))))))))</pre></tr><tr><td class="docs">
+      (apply str
+             (map char
+                  (take length
+                        (doall (repeatedly (+ 2 length) #(.read rdr)))))))))</pre></tr><tr><td class="docs">
 </td><td class="codes" /><pre class="brush: clojure">(defmethod response \: [rdr]
-  (.readLine rdr))</pre></tr><tr><td class="docs">
+  (Long/parseLong (.readLine rdr)))</pre></tr><tr><td class="docs">
 </td><td class="codes" /><pre class="brush: clojure">(defmethod response \* [rdr]
   (let [length (Integer/parseInt (.readLine rdr))]
     (doall (repeatedly length #(response rdr)))))</pre></tr><tr><td class="docs"><p>Creates the connection to the sever and sends the query. Parses and
   returns the response.</p>
 </td><td class="codes" /><pre class="brush: clojure">(defn request
-  [connection query]
+  [connection &amp; query]
   (let [socket (doto (Socket. &quot;127.0.0.1&quot; 6379)
                  (.setTcpNoDelay true)
                  (.setKeepAlive true))
         in (.getInputStream socket)
         out (.getOutputStream socket)
         rdr (io/reader (InputStreamReader. in))]
-    (.write out (.getBytes query))
-    (response rdr)))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a><div id="floating-toc"><ul><li class="floating-toc-li" id="floating-toc_accession.connection">accession.connection</li><li class="floating-toc-li" id="floating-toc_accession.core">accession.core</li><li class="floating-toc-li" id="floating-toc_accession.protocol">accession.protocol</li><li class="floating-toc-li" id="floating-toc_accession.request">accession.request</li></ul></div></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+    (.write out (.getBytes (apply str query)))
+    (if (next query)
+      (doall (repeatedly (count query) #(response rdr)))
+      (response rdr))))</pre></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a><div id="floating-toc"><ul><li class="floating-toc-li" id="floating-toc_accession.connection">accession.connection</li><li class="floating-toc-li" id="floating-toc_accession.core">accession.core</li><li class="floating-toc-li" id="floating-toc_accession.protocol">accession.protocol</li><li class="floating-toc-li" id="floating-toc_accession.request">accession.request</li></ul></div></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
        SyntaxHighlighter.all()</script></body></html>
