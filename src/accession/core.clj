@@ -21,13 +21,64 @@
   [connection & body]
   `(request ~connection ~@body))
 
+;; We would like to create one function for each command which Redis
+;; supports. The set function would look something like this:
+;;
+;;    (defn set [key value]
+;;      (request (query "set" key value))
+;;
+;; Similarly, the get function would be:
+;;
+;;     (defn get [key]
+;;       (request (query "get" key)))
+;;
+;; Because each of these functions has the same pattern, we can use a
+;; macro to create them and save a lot of typing.
+
 (defmacro defquery
+  "Given a redis command and a parameter list, create a function of
+   the form:
+
+       (defn <name> <parameter-list>
+         (request (query <command> <p1> <p2> ... <pN>)))
+
+  The name which is passed is a symbol and is first used as a symbol
+  for the function name. We convert this symbol to a string and use
+  that string as the command name.
+
+  params is a list of N symbols which represent the parameters to the
+  function. We use this list as the parameter-list when we create the
+  function. Each symbol in this list will be an argument to query
+  after the command. We use splicing unquote (~@) to insert these
+  arguments after the command string."
   [name params]
   (let [command (str name)]
     `(defn ~name ~params
        (query ~command ~@params))))
 
 (defmacro defqueries
+  "Given any number of redis commands and argument lists, convert them
+   to function definitions.
+
+   A call to:
+
+       (defqueries (set [key value]) (get [key]))
+
+   will expand to:
+
+       (do
+         (defn set [key value]
+           (request (query \"set\" key value)))
+         (defn get [key]
+           (request (query \"get\" key))))
+
+   This is an interesting use of unquote splicing. Unquote splicing
+   works on a sequence and that sequence can be the result of a
+   function call as it is here. The function which produces this
+   sequence maps each argument passed to this macro over a function
+   which takes each list like (set [key value]), binds it to q, and
+   uses unquote splicing again to create a call to defquery which
+   looks like (defquery set [key value])."
   [& queries]
   `(do ~@(map (fn [q] `(defquery ~@q)) queries)))
 
