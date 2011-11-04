@@ -35,7 +35,7 @@
       (apply str (map char (take length (doall (repeatedly (+ 2 length) #(.read rdr)))))))))
 
 (defmethod response \: [rdr]
-  (.readLine rdr))
+  (Long/parseLong (.readLine rdr)))
 
 (defmethod response \* [rdr]
   (let [length (Integer/parseInt (.readLine rdr))]
