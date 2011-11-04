@@ -4,16 +4,17 @@ A Clojure library for redis
 
 ## Usage
    
-   Accession is used just like you would use redis from the command
-   line. All available redis commands will be implemented. For a list
-   of currently implemented commands see
-   [core.clj](https://github.com/abedra/accession/blob/master/src/accession/core.clj). The
-   example below demonstrates standard usage:
+Accession is used just like you would use redis from the command
+line. All available redis commands will be implemented. For a list
+of currently implemented commands see
+[core.clj](https://github.com/abedra/accession/blob/master/src/accession/core.clj). The
+example below demonstrates standard usage:
 
     (require '[accession.core :as redis])
-    (redis/set "foo" "some value")
+	(def c (redis/defconnection {})
+    (redis/with-connection c (redis/set "foo" "some value")
     -> "OK"
-    (redis/get "foo")
+    (redis/with-connection c (redis/get "foo")
     -> "some value"
 
 This library is targeted at Redis 2.0+. If you are using an older

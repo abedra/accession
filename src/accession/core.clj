@@ -1,13 +1,31 @@
 (ns accession.core
   (:refer-clojure :exclude [get set keys type sync])
   (:use [accession.protocol :only (query)]
-        [accession.request :only (request)]))
+        [accession.request :only (request)]
+        [accession.connection :only (connection)]))
+
+(defmacro defconnection
+  "Creates a socket with the given connection info in the form of:
+
+       {:host hostname
+        :port portnumber
+        :password password}
+
+   If an empty map is provided, localhost defaults will be used"
+  [spec]
+  `(connection ~spec))
+
+(defmacro with-connection
+  "Responsible for calling the request function and providing the
+  connection details"
+  [connection & body]
+  `(request ~connection ~@body))
 
 (defmacro defquery
   [name params]
   (let [command (str name)]
     `(defn ~name ~params
-       (request (query ~command ~@params)))))
+       (query ~command ~@params))))
 
 (defmacro defqueries
   [& queries]
