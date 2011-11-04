@@ -25,20 +25,27 @@
 
 (defmacro with-connection
   "Responsible for calling the request function and providing the
-  connection details"
+   connection details. This does not need to me a macro and could
+   be implemented as:
+
+       (apply request connection body)
+
+   But applying arguments to a function is slower than a standard
+   function call. The macro implementation generates faster runtime
+   code with all of the bodies spliced in."
   [connection & body]
   `(request ~connection ~@body))
 
 ;; We would like to create one function for each command which Redis
-;; supports. The set function would look something like this:
+;; supports. The set function would looks something like this:
 ;;
-;;    (defn set [key value]
-;;      (request (query "set" key value)))
+;;     (defn set [key value]
+;;       (query "set" key value))
 ;;
 ;; Similarly, the get function would be:
 ;;
 ;;     (defn get [key]
-;;       (request (query "get" key)))
+;;       (query "get" key))
 ;;
 ;; Because each of these functions has the same pattern, we can use a
 ;; macro to create them and save a lot of typing.
@@ -60,7 +67,7 @@
    the form:
 
        (defn <name> <parameter-list>
-         (request (query <command> <p1> <p2> ... <pN>)))
+         (query <command> <p1> <p2> ... <pN>))
 
   The name which is passed is a symbol and is first used as a symbol
   for the function name. We convert this symbol to a string and use
@@ -89,9 +96,9 @@
 
        (do
          (defn set [key value]
-           (request (query \"set\" key value)))
+           (query \"set\" key value))
          (defn get [key]
-           (request (query \"get\" key))))
+           (query \"get\" key)))
 
    This is an interesting use of unquote splicing. Unquote splicing
    works on a sequence and that sequence can be the result of a
