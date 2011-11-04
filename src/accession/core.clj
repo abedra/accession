@@ -86,7 +86,10 @@
    sequence maps each argument passed to this macro over a function
    which takes each list like (set [key value]), binds it to q, and
    uses unquote splicing again to create a call to defquery which
-   looks like (defquery set [key value])."
+   looks like (defquery set [key value]).
+
+   Finally, a macro can only return a single form, so we wrap all of
+   the produced expressions in a do special form."
   [& queries]
   `(do ~@(map (fn [q] `(defquery ~@q)) queries)))
 
