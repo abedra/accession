@@ -2557,12 +2557,63 @@ $(document).ready(function() {
   connection details</p>
 </td><td class="codes" /><pre class="brush: clojure">(defmacro with-connection
   [connection &amp; body]
-  `(request ~connection ~@body))</pre></tr><tr><td class="docs">
+  `(request ~connection ~@body))</pre></tr><tr><td class="docs"><p>We would like to create one function for each command which Redis
+supports. The set function would look something like this:</p>
+
+<p>(defn set [key value]
+(request (query "set" key value))</p>
+
+<p>Similarly, the get function would be:</p>
+
+<p>(defn get [key]
+(request (query "get" key)))</p>
+
+<p>Because each of these functions has the same pattern, we can use a
+macro to create them and save a lot of typing.</p>
+</td><td class="codes" /></tr><tr><td class="docs"><p>Given a redis command and a parameter list, create a function of
+   the form:</p>
+
+<pre><code>   (defn &lt;name&gt; &lt;parameter-list&gt;
+     (request (query &lt;command&gt; &lt;p1&gt; &lt;p2&gt; ... &lt;pN&gt;)))
+</code></pre>
+
+<p>  The name which is passed is a symbol and is first used as a symbol
+  for the function name. We convert this symbol to a string and use
+  that string as the command name.</p>
+
+<p>  params is a list of N symbols which represent the parameters to the
+  function. We use this list as the parameter-list when we create the
+  function. Each symbol in this list will be an argument to query
+  after the command. We use splicing unquote (~@) to insert these
+  arguments after the command string.</p>
 </td><td class="codes" /><pre class="brush: clojure">(defmacro defquery
   [name params]
   (let [command (str name)]
     `(defn ~name ~params
-       (query ~command ~@params))))</pre></tr><tr><td class="docs">
+       (query ~command ~@params))))</pre></tr><tr><td class="docs"><p>Given any number of redis commands and argument lists, convert them
+   to function definitions.</p>
+
+<p>   A call to:</p>
+
+<pre><code>   (defqueries (set [key value]) (get [key]))
+</code></pre>
+
+<p>   will expand to:</p>
+
+<pre><code>   (do
+     (defn set [key value]
+       (request (query "set" key value)))
+     (defn get [key]
+       (request (query "get" key))))
+</code></pre>
+
+<p>   This is an interesting use of unquote splicing. Unquote splicing
+   works on a sequence and that sequence can be the result of a
+   function call as it is here. The function which produces this
+   sequence maps each argument passed to this macro over a function
+   which takes each list like (set [key value]), binds it to q, and
+   uses unquote splicing again to create a call to defquery which
+   looks like (defquery set [key value]).</p>
 </td><td class="codes" /><pre class="brush: clojure">(defmacro defqueries
   [&amp; queries]
   `(do ~@(map (fn [q] `(defquery ~@q)) queries)))</pre></tr><tr><td class="docs">
