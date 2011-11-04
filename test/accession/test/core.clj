@@ -1,12 +1,13 @@
 (ns accession.test.core
   (:use clojure.test)
-  (:require [accession.core :as redis]))
+  (:require [accession.core :as redis]
+            [accession.protocol :as protocol]))
 
 (redis/flushall)
 
 (deftest test-command-construction
-  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (redis/query "set" "foo" "bar")))
-  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (redis/query "get" "bar"))))
+  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (protocol/query "set" "foo" "bar")))
+  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (protocol/query "get" "bar"))))
 
 (deftest test-echo
   (is (= "Message" (redis/echo "Message")))
