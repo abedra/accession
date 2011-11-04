@@ -44,12 +44,14 @@
 (defn request
   "Creates the connection to the sever and sends the query. Parses and
   returns the response."
-  [connection query]
+  [connection & query]
   (let [socket (doto (Socket. "127.0.0.1" 6379)
                  (.setTcpNoDelay true)
                  (.setKeepAlive true))
         in (.getInputStream socket)
         out (.getOutputStream socket)
         rdr (io/reader (InputStreamReader. in))]
-    (.write out (.getBytes query))
-    (response rdr)))
+    (.write out (.getBytes (apply str query)))
+    (if (next query)
+      (doall (repeatedly (count query) #(response rdr)))
+      (response rdr))))

@@ -147,4 +147,20 @@
   (is (= 0
          (redis/with-connection c (redis/dbsize)))))
 
+(deftest test-pipeline
+  (redis/with-connection c
+    (redis/rpush "children" "A")
+    (redis/rpush "children" "B")
+    (redis/rpush "children" "C"))
+  (redis/with-connection c (redis/set "favorite:child" "B"))
+  (is (= ["B" "B"]
+         (redis/with-connection c
+           (redis/get "favorite:child")
+           (redis/get "favorite:child"))))
+  (is (= ["B" ["A" "B" "C"] "B"]
+         (redis/with-connection c
+           (redis/get "favorite:child")
+           (redis/lrange "children" "0" "3")
+           (redis/get "favorite:child")))))
+
 (redis/with-connection c (redis/flushall))
