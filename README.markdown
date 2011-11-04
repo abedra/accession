@@ -22,6 +22,11 @@ version of Redis or are using a version of Clojure earlier than 1.3.0,
 you may have better luck with
 [redis-clojure](https://github.com/ragnard/redis-clojure).
 
+## Contributors
+
+[Brenton Ashworth](http://github.com/brentonashworth)
+[Michael Fogus](http://github.com/fogus)
+
 ## License
 
 Copyright (C) 2011 Aaron Bedra
