@@ -86,16 +86,12 @@
 
 ;; A call to:
 ;;
-;;     (defqueries (set [key value]) (get [key]))
-;;
+;; <pre><code>(defqueries (set [key value]))</code></pre>
+;;     
 ;; will expand to:
 ;;
-;;     (do
-;;       (defn set [key value]
-;;         (query "set" key value))
-;;       (defn get [key]
-;;         (query "get" key)))
-;;
+;; <pre><code>(do (defn set [key value] (query "set" key value)))</pre></code>
+;; 
 
 (defmacro defqueries
   "Given any number of redis commands and argument lists, convert them

@@ -32,7 +32,10 @@
 (defmethod response \$ [rdr]
   (let [length (Integer/parseInt (.readLine rdr))]
     (when (not= length -1)
-      (apply str (map char (take length (doall (repeatedly (+ 2 length) #(.read rdr)))))))))
+      (apply str
+             (map char
+                  (take length
+                        (doall (repeatedly (+ 2 length) #(.read rdr)))))))))
 
 (defmethod response \: [rdr]
   (Long/parseLong (.readLine rdr)))
