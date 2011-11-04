@@ -84,21 +84,22 @@
     `(defn ~name ~params
        (apply query ~command ~@p))))
 
+;; A call to:
+;;
+;;     (defqueries (set [key value]) (get [key]))
+;;
+;; will expand to:
+;;
+;;     (do
+;;       (defn set [key value]
+;;         (query "set" key value))
+;;       (defn get [key]
+;;         (query "get" key)))
+;;
+
 (defmacro defqueries
   "Given any number of redis commands and argument lists, convert them
    to function definitions.
-
-   A call to:
-
-       (defqueries (set [key value]) (get [key]))
-
-   will expand to:
-
-       (do
-         (defn set [key value]
-           (query \"set\" key value))
-         (defn get [key]
-           (query \"get\" key)))
 
    This is an interesting use of unquote splicing. Unquote splicing
    works on a sequence and that sequence can be the result of a
