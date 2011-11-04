@@ -25,7 +25,7 @@
 
 (defmacro with-connection
   "Responsible for calling the request function and providing the
-   connection details. This does not need to me a macro and could
+   connection details. This does not need to be a macro and could
    be implemented as:
 
        (apply request connection body)
@@ -37,7 +37,7 @@
   `(request ~connection ~@body))
 
 ;; We would like to create one function for each command which Redis
-;; supports. The set function would looks something like this:
+;; supports. The set function would look something like this:
 ;;
 ;;     (defn set [key value]
 ;;       (query "set" key value))
