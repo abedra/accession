@@ -33,7 +33,7 @@
 ;; supports. The set function would look something like this:
 ;;
 ;;    (defn set [key value]
-;;      (request (query "set" key value))
+;;      (request (query "set" key value)))
 ;;
 ;; Similarly, the get function would be:
 ;;
@@ -42,6 +42,18 @@
 ;;
 ;; Because each of these functions has the same pattern, we can use a
 ;; macro to create them and save a lot of typing.
+
+(defn parameters
+  "This function enables vararg style definitions in the queries. For
+  example you can say:
+
+       (mget [key & keys])
+
+  and the defquery macro will properly expand out into a variable
+  argument function"
+  [params]
+  (let [[args varargs] (split-with #(not= '& %)  params)]
+    (conj (vec args) (last varargs))))
 
 (defmacro defquery
   "Given a redis command and a parameter list, create a function of
@@ -57,12 +69,13 @@
   params is a list of N symbols which represent the parameters to the
   function. We use this list as the parameter-list when we create the
   function. Each symbol in this list will be an argument to query
-  after the command. We use splicing unquote (~@) to insert these
+  after the command. We use unquote splicing (~@) to insert these
   arguments after the command string."
   [name params]
-  (let [command (str name)]
+  (let [command (str name)
+        p (parameters params)]
     `(defn ~name ~params
-       (query ~command ~@params))))
+       (apply query ~command ~@p))))
 
 (defmacro defqueries
   "Given any number of redis commands and argument lists, convert them
@@ -131,7 +144,7 @@
   (msetnx           [key value])
   (setrange         [key offset value])
   (get              [key])
-  (mget             [key])
+  (mget             [key & keys])
   (getbit           [key offset])
   (getset           [key value])
   (getrange         [key start end])
