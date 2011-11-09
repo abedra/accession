@@ -52,7 +52,7 @@
 
 (defn parameters
   "This function enables vararg style definitions in the queries. For
-  example you can say:
+  example you can write:
 
        (mget [key & keys])
 
