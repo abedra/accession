@@ -48,9 +48,7 @@
   "Creates the connection to the sever and sends the query. Parses and
   returns the response."
   [connection & query]
-  (let [socket (doto (Socket. "127.0.0.1" 6379)
-                 (.setTcpNoDelay true)
-                 (.setKeepAlive true))
+  (let [socket (:socket connection)
         in (.getInputStream socket)
         out (.getOutputStream socket)
         rdr (io/reader (InputStreamReader. in))]
