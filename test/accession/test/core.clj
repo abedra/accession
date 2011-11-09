@@ -90,6 +90,17 @@
          (redis/with-connection c (redis/lrange "friends" "0" "-1"))))
   (redis/with-connection c (redis/del "friends")))
 
+(deftest test-non-string-params
+  (is (= "OK"
+         (redis/with-connection c (redis/set "statement" "I am doing well"))))
+  (is (= "doing well"
+         (redis/with-connection c (redis/getrange "statement" 5 14))))
+  (redis/with-connection c
+    (redis/rpush "alist" "A")
+    (redis/rpush "alist" "B")
+    (redis/lpush "alist" "C"))
+  (is (= ["A" "B"]) (redis/lrange "alist" 0 2)))
+
 (deftest test-hashes
   (redis/with-connection c (redis/hset "myhash" "field1" "value1"))
   (is (= "value1"
