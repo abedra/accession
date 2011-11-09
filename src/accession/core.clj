@@ -237,7 +237,7 @@
   (zremrangebyrank  [key start stop])
   (zremrangebyscore [key min max])
   (zrevrank         [key member])
-  (zcore            [key member])
+  (zscore           [key member])
   (zunionstore      [destination numkeys set1 set2])
 
   (publish          [channel message])
