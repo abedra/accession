@@ -1,15 +1,14 @@
 (ns accession.test.core
   (:use clojure.test)
-  (:require [accession.core :as redis]
-            [accession.protocol :as protocol]))
+  (:require [accession.core :as redis]))
 
-(def c (redis/defconnection {}))
+(def c (redis/create-connection {}))
 
 (redis/with-connection c (redis/flushall))
 
 (deftest test-command-construction
-  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (protocol/query "set" "foo" "bar")))
-  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (protocol/query "get" "bar"))))
+  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (redis/query "set" "foo" "bar")))
+  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (redis/query "get" "bar"))))
 
 (deftest test-echo
   (is (= "Message" (redis/with-connection c (redis/echo "Message"))))
@@ -173,5 +172,22 @@
            (redis/get "favorite:child")
            (redis/lrange "children" "0" "3")
            (redis/get "favorite:child")))))
+
+(deftest test-pubsub
+  (let [received (atom [])
+        channel (redis/open-channel c (redis/subscribe "ps-foo")
+                                    #(swap! received conj %))]
+    (redis/with-connection c
+      (redis/publish "ps-foo" "one")
+      (redis/publish "ps-foo" "two")
+      (redis/publish "ps-foo" "three"))
+    (Thread/sleep 1000)
+    (is (= @received [["subscribe" "ps-foo" 1]
+                      ["message" "ps-foo" "one"]
+                      ["message" "ps-foo" "two"]
+                      ["message" "ps-foo" "three"]]))
+    (redis/close channel)))
+
+;; Add an example of following multiple channels and unsubscribing.
 
 (redis/with-connection c (redis/flushall))
