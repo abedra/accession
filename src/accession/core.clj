@@ -8,33 +8,131 @@
 
 (ns accession.core
   (:refer-clojure :exclude [get set keys type sync sort])
-  (:use [accession.protocol :only (query)]
-        [accession.request :only (request)]
-        [accession.connection :only (connection)]))
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str])
+  (:import (java.net Socket)
+           (java.io InputStreamReader)))
 
-(defmacro defconnection
-  "Creates a socket with the given connection info in the form of:
+(defn query
+  "The new [unified protocol][up] was introduced in Redis 1.2, but it became
+  the standard way for talking with the Redis server in Redis 2.0.
+  In the unified protocol all the arguments sent to the Redis server
+  are binary safe. This is the general form:
 
-       {:host hostname
-        :port portnumber
-        :password password}
+      *<number of arguments> CR LF
+      $<number of bytes of argument 1> CR LF
+      <argument data> CR LF
+      ...
+      $<number of bytes of argument N> CR LF
+      <argument data> CR LF
+   
+  See the following example:
 
-   If an empty map is provided, localhost defaults will be used"
-  [spec]
-  `(connection ~spec))
+      *3
+      $3
+      SET
+      $5
+      mykey
+      $7
+      myvalue
 
-(defmacro with-connection
-  "Responsible for calling the request function and providing the
-   connection details. This does not need to be a macro and could
-   be implemented as:
+  This is how the above command looks as a quoted string, so that it
+  is possible to see the exact value of every byte in the query:
 
-       (apply request connection body)
+  [up]: http://redis.io/topics/protocol
+  "
+  [name & args]
+  (str "*"
+       (+ 1 (count args)) "\r\n"
+       "$" (count name) "\r\n"
+       (str/upper-case name) "\r\n"
+       (str/join "\r\n"
+                 (map (fn [a] (str "$" (count (str a)) "\r\n" a))
+                      args))
+       "\r\n"))
+;; <pre>"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n"</pre>
 
-   But applying arguments to a function is slower than a standard
-   function call. The macro implementation generates faster runtime
-   code with all of the bodies spliced in."
-  [connection & body]
-  `(request ~connection ~@body))
+(defprotocol IRedisChannel
+  (send-command [this query])
+  (close [this]))
+
+(defmulti response
+  "Redis will reply to commands with different kinds of replies. It is
+  possible to check the kind of reply from the first byte sent by the
+  server:
+
+  * With a single line reply the first byte of the reply will be `+`
+  * With an error message the first byte of the reply will be `-`
+  * With an integer number the first byte of the reply will be `:`
+  * With bulk reply the first byte of the reply will be `$`
+  * With multi-bulk reply the first byte of the reply will be `*`"
+  (fn [r] (char (.read r))))
+
+(defmethod response \- [rdr]
+  (.readLine rdr))
+
+(defmethod response \+ [rdr]
+  (.readLine rdr))
+
+(defmethod response \$ [rdr]
+  (let [length (Integer/parseInt (.readLine rdr))]
+    (when (not= length -1)
+      (apply str
+             (map char
+                  (take length
+                        (doall (repeatedly (+ 2 length) #(.read rdr)))))))))
+
+(defmethod response \: [rdr]
+  (Long/parseLong (.readLine rdr)))
+
+(defmethod response \* [rdr]
+  (let [length (Integer/parseInt (.readLine rdr))]
+    (doall (repeatedly length #(response rdr)))))
+
+(defn request
+  [conn & query]
+  (with-open [socket (doto (Socket. (:host conn) (:port conn))
+                       (.setTcpNoDelay true)
+                       (.setKeepAlive true)
+                       (.setSoTimeout (:timeout conn)))
+              in (.getInputStream socket)
+              out (.getOutputStream socket)
+              rdr (io/reader (InputStreamReader. in))]
+    (.write out (.getBytes (apply str query)))
+    (if (next query)
+      (doall (repeatedly (count query) #(response rdr)))
+      (response rdr))))
+
+(defrecord RedisChannel [socket out]
+  IRedisChannel
+  (send-command [this query]
+    (.write out (.getBytes query)))
+  (close [this]
+    (.close socket)))
+
+(defn open-channel
+  [conn query f]
+  (let [socket (doto (Socket. (:host conn) (:port conn))
+                 (.setTcpNoDelay true)
+                 (.setKeepAlive true))
+        in (.getInputStream socket)
+        out (.getOutputStream socket)
+        rdr (io/reader (InputStreamReader. in))]
+    (.write out (.getBytes query))
+    (future (doall (repeatedly #(f (response rdr)))))
+    (RedisChannel. socket out)))
+
+(defn create-connection
+  ([spec]
+     (let [default {:host "127.0.0.1"
+                    :port 6379
+                    :password nil
+                    :socket nil
+                    :timeout 0}]
+       (merge default spec))))
+
+(defn with-connection [conn & body]
+  (apply request conn body))
 
 ;; We would like to create one function for each command which Redis
 ;; supports. The set function would look something like this:
@@ -241,7 +339,8 @@
   (zunionstore      [destination numkeys set1 set2])
 
   (publish          [channel message])
-  (subscribe        [channel & channels])
+  (subscribe        [channel & channels]) ;; Add something to indicate
+  ;; that this returns a channel
   (unsubscribe      [channel & channels])
   (punsubscribe     [pattern & patterns])
   (psubscribe       [pattern & patterns]))
