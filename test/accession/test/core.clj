@@ -2,7 +2,7 @@
   (:use clojure.test)
   (:require [accession.core :as redis]))
 
-(def c (redis/create-connection {}))
+(def c (redis/connection-map))
 
 (redis/with-connection c (redis/flushall))
 
@@ -175,19 +175,51 @@
 
 (deftest test-pubsub
   (let [received (atom [])
-        channel (redis/open-channel c (redis/subscribe "ps-foo")
-                                    #(swap! received conj %))]
+        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})]
     (redis/with-connection c
       (redis/publish "ps-foo" "one")
       (redis/publish "ps-foo" "two")
       (redis/publish "ps-foo" "three"))
-    (Thread/sleep 1000)
+    (Thread/sleep 500)
     (is (= @received [["subscribe" "ps-foo" 1]
                       ["message" "ps-foo" "one"]
                       ["message" "ps-foo" "two"]
                       ["message" "ps-foo" "three"]]))
-    (redis/close channel)))
+    (redis/close channel))
 
-;; Add an example of following multiple channels and unsubscribing.
+  (let [received (atom [])
+        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})
+        _ (redis/subscribe channel {"ps-baz" #(swap! received conj %)})]
+    (redis/with-connection c
+      (redis/publish "ps-foo" "one")
+      (redis/publish "ps-bar" "two")
+      (redis/publish "ps-baz" "three"))
+    (Thread/sleep 500)
+    (is (= @received [["subscribe" "ps-foo" 1]
+                      ["subscribe" "ps-baz" 2]
+                      ["message" "ps-foo" "one"]
+                      ["message" "ps-baz" "three"]]))
+    (redis/close channel))
+
+  (let [received (atom [])
+        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})
+        _ (redis/subscribe channel {"ps-baz" #(swap! received conj %)})]
+    (redis/with-connection c
+      (redis/publish "ps-foo" "one")
+      (redis/publish "ps-bar" "two")
+      (redis/publish "ps-baz" "three"))
+    (Thread/sleep 500)
+    (redis/unsubscribe channel "ps-foo")
+    (Thread/sleep 500)
+    (redis/with-connection c
+      (redis/publish "ps-foo" "four")
+      (redis/publish "ps-baz" "five"))
+    (Thread/sleep 500)
+    (is (= @received [["subscribe" "ps-foo" 1]
+                      ["subscribe" "ps-baz" 2]
+                      ["message" "ps-foo" "one"]
+                      ["message" "ps-baz" "three"]
+                      ["message" "ps-baz" "five"]]))
+    (redis/close channel)))
 
 (redis/with-connection c (redis/flushall))

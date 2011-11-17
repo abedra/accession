@@ -30,11 +30,11 @@
 
 (deftest test-timeout
   (let [server (start-server)
-        conn (redis/create-connection {:port 9000})]
+        conn (redis/connection-map {:port 9000})]
     (do (is (= (redis/with-connection conn (redis/get "foo")) ["one" "two" "three"]))
         (stop-server server)))
   (let [server (start-server)
-        conn (redis/create-connection {:port 9000 :timeout 500})]
+        conn (redis/connection-map {:port 9000 :timeout 500})]
     (do (is (thrown? Exception
                      (redis/with-connection conn (redis/get "foo"))))
         (stop-server server))))

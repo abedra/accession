@@ -52,8 +52,15 @@
        "\r\n"))
 ;; <pre>"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n"</pre>
 
+(defprotocol ISubscribable
+  (subscribe [this channels])
+  #_(psubscribe [this channels]))
+
+(defprotocol IUnsubscribable
+  (unsubscribe [this channels])
+  #_(punsubscribe [this channels]))
+
 (defprotocol IRedisChannel
-  (send-command [this query])
   (close [this]))
 
 (defmulti response
@@ -89,11 +96,14 @@
   (let [length (Integer/parseInt (.readLine rdr))]
     (doall (repeatedly length #(response rdr)))))
 
+(defn- socket [spec]
+  (doto (Socket. (:host spec) (:port spec))
+    (.setTcpNoDelay true)
+    (.setKeepAlive true)))
+
 (defn request
   [conn & query]
-  (with-open [socket (doto (Socket. (:host conn) (:port conn))
-                       (.setTcpNoDelay true)
-                       (.setKeepAlive true)
+  (with-open [socket (doto (socket conn)
                        (.setSoTimeout (:timeout conn)))
               in (.getInputStream socket)
               out (.getOutputStream socket)
@@ -103,26 +113,46 @@
       (doall (repeatedly (count query) #(response rdr)))
       (response rdr))))
 
-(defrecord RedisChannel [socket out]
+(defn receive-message [channel-spec rdr]
+  (let [next-message (response rdr)
+        channel-name (second next-message)]
+    (if-let [f (clojure.core/get @channel-spec channel-name)]
+      (f next-message))))
+
+(defn write-commands [out command channels]
+  (.write out (.getBytes (apply query command (clojure.core/keys channels)))))
+
+(defrecord RedisChannel [channel-fns socket out]
+  ISubscribable
+  (subscribe [this channels]
+    (do (swap! channel-fns merge channels)
+        (write-commands out "subscribe" channels)))
+  IUnsubscribable
+  (unsubscribe [this channel]
+    (do (swap! channel-fns dissoc channel)
+        (.write out (.getBytes (query "unsubscribe" channel)))))
   IRedisChannel
-  (send-command [this query]
-    (.write out (.getBytes query)))
   (close [this]
     (.close socket)))
 
 (defn open-channel
-  [conn query f]
-  (let [socket (doto (Socket. (:host conn) (:port conn))
-                 (.setTcpNoDelay true)
-                 (.setKeepAlive true))
+  [conn command channels]
+  (let [socket (socket conn)
         in (.getInputStream socket)
         out (.getOutputStream socket)
-        rdr (io/reader (InputStreamReader. in))]
-    (.write out (.getBytes query))
-    (future (doall (repeatedly #(f (response rdr)))))
-    (RedisChannel. socket out)))
+        rdr (io/reader (InputStreamReader. in))
+        channel-fns (atom channels)]
+    (write-commands out command channels)
+    (future (doall (repeatedly #(receive-message channel-fns rdr))))
+    (RedisChannel. channel-fns socket out)))
 
-(defn create-connection
+(extend-type clojure.lang.PersistentArrayMap
+  ISubscribable
+  (subscribe [this channels]
+    (open-channel this "subscribe" channels)))
+
+(defn connection-map
+  ([] (connection-map {}))
   ([spec]
      (let [default {:host "127.0.0.1"
                     :port 6379
@@ -131,8 +161,8 @@
                     :timeout 0}]
        (merge default spec))))
 
-(defn with-connection [conn & body]
-  (apply request conn body))
+(defn with-connection [spec & body]
+  (apply request spec body))
 
 ;; We would like to create one function for each command which Redis
 ;; supports. The set function would look something like this:
@@ -339,8 +369,4 @@
   (zunionstore      [destination numkeys set1 set2])
 
   (publish          [channel message])
-  (subscribe        [channel & channels]) ;; Add something to indicate
-  ;; that this returns a channel
-  (unsubscribe      [channel & channels])
-  (punsubscribe     [pattern & patterns])
-  (psubscribe       [pattern & patterns]))
+  )
