@@ -1,4 +1,4 @@
-# Accession
+# Accession [![Build Status](https://secure.travis-ci.org/abedra/accession.png)](http://travis-ci.org/abedra/accession?branch=master)
 
 A Clojure library for redis
 
