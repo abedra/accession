@@ -10,12 +10,26 @@ of currently implemented commands see
 [core.clj](https://github.com/abedra/accession/blob/master/src/accession/core.clj). The
 example below demonstrates standard usage:
 
+    ;; Make sure to alias accession.core since several clojure.core
+    ;; functions are replaced
     (require '[accession.core :as redis])
-	(def c (redis/defconnection {})
-    (redis/with-connection c (redis/set "foo" "some value")
+     
+    ;; Create a connection to redis
+    (def c (redis/defconnection {}))
+     
+    ;; Use the connection to run commands against redis
+    (redis/with-connection c (redis/set "foo" "some value"))
     -> "OK"
-    (redis/with-connection c (redis/get "foo")
+    (redis/with-connection c (redis/get "foo"))
     -> "some value"
+     
+    ;; When you run multiple queries, accession will assume
+    ;; pipelining. This behavior is subject to change.
+    (redis/with-connection c
+        (redis/rpush "children" "A")
+        (redis/rpush "children" "B")
+        (redis/rpush "children" "C"))
+    -> (1 2 3)
 
 This library is targeted at Redis 2.0+. If you are using an older
 version of Redis or are using a version of Clojure earlier than 1.3.0,
