@@ -3,4 +3,5 @@
   :dependencies [[org.clojure/clojure "1.4.0-alpha1"]]
   :dev-dependencies [[swank-clojure "1.3.0"]
                      [marginalia "0.7.0-SNAPSHOT"]
-                     [lein-marginalia "0.6.1"]])
+                     [lein-marginalia "0.6.1"]
+                     [lein-clojars "0.6.0"]])
