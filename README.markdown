@@ -11,10 +11,10 @@ of currently implemented commands see
 example below demonstrates standard usage:
 
     (require '[accession.core :as redis])
-	(def c (redis/defconnection {})
-    (redis/with-connection c (redis/set "foo" "some value")
+	(def c (redis/defconnection {}))
+    (redis/with-connection c (redis/set "foo" "some value"))
     -> "OK"
-    (redis/with-connection c (redis/get "foo")
+    (redis/with-connection c (redis/get "foo"))
     -> "some value"
 
 This library is targeted at Redis 2.0+. If you are using an older
