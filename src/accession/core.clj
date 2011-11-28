@@ -11,7 +11,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str])
   (:import (java.net Socket)
-           (java.io InputStreamReader)))
+           (java.io BufferedInputStream DataInputStream)))
 
 (defn query
   "The new [unified protocol][up] was introduced in Redis 1.2, but it became
@@ -73,28 +73,27 @@
   * With an integer number the first byte of the reply will be `:`
   * With bulk reply the first byte of the reply will be `$`
   * With multi-bulk reply the first byte of the reply will be `*`"
-  (fn [r] (char (.read r))))
+  (fn [in] (char (.readByte in))))
 
-(defmethod response \- [rdr]
-  (.readLine rdr))
+(defmethod response \- [in]
+  (.readLine in))
 
-(defmethod response \+ [rdr]
-  (.readLine rdr))
+(defmethod response \+ [in]
+  (.readLine in))
 
-(defmethod response \$ [rdr]
-  (let [length (Integer/parseInt (.readLine rdr))]
+(defmethod response \$ [in]
+  (let [length (Integer/parseInt (.readLine in))]
     (when (not= length -1)
-      (apply str
-             (map char
-                  (take length
-                        (doall (repeatedly (+ 2 length) #(.read rdr)))))))))
+      (let [content (byte-array (+ 2 length))]
+        (.read in content)
+        (String. content 0 length)))))
 
-(defmethod response \: [rdr]
-  (Long/parseLong (.readLine rdr)))
+(defmethod response \: [in]
+  (Long/parseLong (.readLine in)))
 
-(defmethod response \* [rdr]
-  (let [length (Integer/parseInt (.readLine rdr))]
-    (doall (repeatedly length #(response rdr)))))
+(defmethod response \* [in]
+  (let [length (Integer/parseInt (.readLine in))]
+    (doall (repeatedly length #(response in)))))
 
 (defn- socket [spec]
   (doto (Socket. (:host spec) (:port spec))
@@ -105,16 +104,15 @@
   [conn & query]
   (with-open [socket (doto (socket conn)
                        (.setSoTimeout (:timeout conn)))
-              in (.getInputStream socket)
-              out (.getOutputStream socket)
-              rdr (io/reader (InputStreamReader. in))]
+              in (DataInputStream. (BufferedInputStream. (.getInputStream socket)))
+              out (.getOutputStream socket)]
     (.write out (.getBytes (apply str query)))
     (if (next query)
-      (doall (repeatedly (count query) #(response rdr)))
-      (response rdr))))
+      (doall (repeatedly (count query) #(response in)))
+      (response in))))
 
-(defn receive-message [channel-spec rdr]
-  (let [next-message (response rdr)
+(defn receive-message [channel-spec in]
+  (let [next-message (response in)
         channel-name (second next-message)]
     (if-let [f (clojure.core/get @channel-spec channel-name)]
       (f next-message))))
@@ -140,10 +138,10 @@
   (let [socket (socket conn)
         in (.getInputStream socket)
         out (.getOutputStream socket)
-        rdr (io/reader (InputStreamReader. in))
+        in (DataInputStream. (BufferedInputStream. in))
         channel-fns (atom channels)]
     (write-commands out command channels)
-    (future (doall (repeatedly #(receive-message channel-fns rdr))))
+    (future (doall (repeatedly #(receive-message channel-fns in))))
     (RedisChannel. channel-fns socket out)))
 
 (extend-type clojure.lang.PersistentArrayMap
