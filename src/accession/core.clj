@@ -47,7 +47,7 @@
        "$" (count name) "\r\n"
        (str/upper-case name) "\r\n"
        (str/join "\r\n"
-                 (map (fn [a] (str "$" (count (str a)) "\r\n" a))
+                 (map (fn [a] (str "$" (count (.getBytes (str a))) "\r\n" a))
                       args))
        "\r\n"))
 ;; <pre>"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n"</pre>
