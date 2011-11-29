@@ -1,15 +1,14 @@
 (ns accession.test.core
   (:use clojure.test)
-  (:require [accession.core :as redis]
-            [accession.protocol :as protocol]))
+  (:require [accession.core :as redis]))
 
-(def c (redis/defconnection {}))
+(def c (redis/connection-map))
 
 (redis/with-connection c (redis/flushall))
 
 (deftest test-command-construction
-  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (protocol/query "set" "foo" "bar")))
-  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (protocol/query "get" "bar"))))
+  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (redis/query "set" "foo" "bar")))
+  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (redis/query "get" "bar"))))
 
 (deftest test-echo
   (is (= "Message" (redis/with-connection c (redis/echo "Message"))))
@@ -89,6 +88,12 @@
   (is (= (quote ("Tom"))
          (redis/with-connection c (redis/lrange "friends" "0" "-1"))))
   (redis/with-connection c (redis/del "friends")))
+
+(deftest test-non-ascii-params
+  (is (= "OK"
+         (redis/with-connection c (redis/set "spanish" "year->año"))))
+  (is (= "year->año"
+         (redis/with-connection c (redis/get "spanish")))))
 
 (deftest test-non-string-params
   (is (= "OK"
@@ -173,5 +178,54 @@
            (redis/get "favorite:child")
            (redis/lrange "children" "0" "3")
            (redis/get "favorite:child")))))
+
+(deftest test-pubsub
+  (let [received (atom [])
+        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})]
+    (redis/with-connection c
+      (redis/publish "ps-foo" "one")
+      (redis/publish "ps-foo" "two")
+      (redis/publish "ps-foo" "three"))
+    (Thread/sleep 500)
+    (is (= @received [["subscribe" "ps-foo" 1]
+                      ["message" "ps-foo" "one"]
+                      ["message" "ps-foo" "two"]
+                      ["message" "ps-foo" "three"]]))
+    (redis/close channel))
+
+  (let [received (atom [])
+        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})
+        _ (redis/subscribe channel {"ps-baz" #(swap! received conj %)})]
+    (redis/with-connection c
+      (redis/publish "ps-foo" "one")
+      (redis/publish "ps-bar" "two")
+      (redis/publish "ps-baz" "three"))
+    (Thread/sleep 500)
+    (is (= @received [["subscribe" "ps-foo" 1]
+                      ["subscribe" "ps-baz" 2]
+                      ["message" "ps-foo" "one"]
+                      ["message" "ps-baz" "three"]]))
+    (redis/close channel))
+
+  (let [received (atom [])
+        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})
+        _ (redis/subscribe channel {"ps-baz" #(swap! received conj %)})]
+    (redis/with-connection c
+      (redis/publish "ps-foo" "one")
+      (redis/publish "ps-bar" "two")
+      (redis/publish "ps-baz" "three"))
+    (Thread/sleep 500)
+    (redis/unsubscribe channel "ps-foo")
+    (Thread/sleep 500)
+    (redis/with-connection c
+      (redis/publish "ps-foo" "four")
+      (redis/publish "ps-baz" "five"))
+    (Thread/sleep 500)
+    (is (= @received [["subscribe" "ps-foo" 1]
+                      ["subscribe" "ps-baz" 2]
+                      ["message" "ps-foo" "one"]
+                      ["message" "ps-baz" "three"]
+                      ["message" "ps-baz" "five"]]))
+    (redis/close channel)))
 
 (redis/with-connection c (redis/flushall))
