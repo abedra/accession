@@ -89,6 +89,12 @@
          (redis/with-connection c (redis/lrange "friends" "0" "-1"))))
   (redis/with-connection c (redis/del "friends")))
 
+(deftest test-non-ascii-params
+  (is (= "OK"
+         (redis/with-connection c (redis/set "spanish" "year->año"))))
+  (is (= "year->año"
+         (redis/with-connection c (redis/get "spanish")))))
+
 (deftest test-non-string-params
   (is (= "OK"
          (redis/with-connection c (redis/set "statement" "I am doing well"))))
