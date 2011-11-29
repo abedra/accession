@@ -1,12 +1,12 @@
 # Accession [![Build Status](https://secure.travis-ci.org/abedra/accession.png)](http://travis-ci.org/abedra/accession?branch=master)
 
-A Clojure library for redis (current version 0.1.0)
+A Clojure library for redis (current version 0.1.1)
 
 ## Installing
 
 Simply add Accession to your leiningen project file:
 
-    [accession "0.1.0"]
+    [accession "0.1.1"]
 
 ## Usage
    
