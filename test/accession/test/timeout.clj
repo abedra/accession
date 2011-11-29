@@ -28,7 +28,7 @@
 (defn stop-server [server]
   (.close (:socket server)))
 
-(deftest test-timeout
+#_(deftest test-timeout
   (let [server (start-server)
         conn (redis/connection-map {:port 9000})]
     (do (is (= (redis/with-connection conn (redis/get "foo")) ["one" "two" "three"]))
