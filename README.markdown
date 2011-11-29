@@ -1,6 +1,12 @@
 # Accession [![Build Status](https://secure.travis-ci.org/abedra/accession.png)](http://travis-ci.org/abedra/accession?branch=master)
 
-A Clojure library for redis
+A Clojure library for redis (current version 0.1.0)
+
+## Installing
+
+Simply add Accession to your leiningen project file:
+
+    [accession "0.1.0"]
 
 ## Usage
    
@@ -14,8 +20,8 @@ example below demonstrates standard usage:
     ;; functions are replaced
     (require '[accession.core :as redis])
      
-    ;; Create a connection to redis
-    (def c (redis/defconnection {}))
+    ;; Create a connection map
+    (def c (redis/connection-map {}))
      
     ;; Use the connection to run commands against redis
     (redis/with-connection c (redis/set "foo" "some value"))
@@ -30,6 +36,22 @@ example below demonstrates standard usage:
         (redis/rpush "children" "B")
         (redis/rpush "children" "C"))
     -> (1 2 3)
+	
+	;; You can use the Redis pub/sub features 
+	(def channel (redis/subscribe c {"bar" (fn [x] (prn x))}))
+	-> ("subscribe" "bar" 1)
+	
+	;; and afterwards add more consumers to the channel
+	(redis/subscribe channel {"baz" #(prn %)})
+	-> ("subscribe" "baz" 2)
+	
+	;; You can send messages like so
+	(redis/with-connection c (redis/publish "bar" "Hello bar") 
+	                         (redis/publish "baz" "Hello baz"))
+	-> ("message" "bar" "Hello bar")
+       ("message" "baz" "Hello baz")
+	
+	;; Again, this API is subject to change.
 
 This library is targeted at Redis 2.0+. If you are using an older
 version of Redis or are using a version of Clojure earlier than 1.3.0,
