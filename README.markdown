@@ -42,6 +42,8 @@ you may have better luck with
 
 [Michael Fogus](http://github.com/fogus)
 
+[Sebastián Galkin](https://github.com/paraseba)
+
 ## License
 
 Copyright (C) 2011 Aaron Bedra
