@@ -58,6 +58,10 @@ version of Redis or are using a version of Clojure earlier than 1.3.0,
 you may have better luck with
 [redis-clojure](https://github.com/ragnard/redis-clojure).
 
+## Documentation
+
+Marginalia generated documentation can be found at [abedra.github.com/accession](http://abedra.github.com/accession).
+
 ## Contributors
 
 [Brenton Ashworth](http://github.com/brentonashworth)
