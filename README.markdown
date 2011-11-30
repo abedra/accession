@@ -8,6 +8,12 @@ Simply add Accession to your leiningen project file:
 
     [accession "0.1.1"]
 
+#### But i'm using clojure 1.x because it is stable. I don't want to use 1.4-alpha2!
+
+That's ok. If you are using Clojure 1.2.1 or higher you shouldn't have any issues. You can tell leiningen not to pull 1.4.0-alpha2 into your project using the `:exclusions` feature:
+
+    [accession "0.1.1" :exclusions [org.clojure/clojure]]
+
 ## Usage
    
 Accession is used just like you would use redis from the command
