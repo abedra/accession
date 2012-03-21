@@ -150,9 +150,16 @@
   (redis/with-connection c (redis/zadd "hackers" "1965" "Yukihiro Matsumoto"))
   (redis/with-connection c (redis/zadd "hackers" "1916" "Claude Shannon"))
   (redis/with-connection c (redis/zadd "hackers" "1969" "Linus Torvalds"))
-  (redis/with-connection c (redis/zadd "hackers" "1912" "Alan Turning"))
+  (redis/with-connection c (redis/zadd "hackers" "1912" "Alan Turing"))
+  (redis/with-connection c (redis/zadd "slackers" "1968" "Pauly Shore"))
+  (redis/with-connection c (redis/zadd "slackers" "1966" "Adam Sandler"))
+  (redis/with-connection c (redis/zadd "slackers" "1962" "Ferris Beuler"))
+  (redis/with-connection c (redis/zadd "slackers" "1871" "Theodore Dreiser"))
+  (redis/with-connection c (redis/zunionstore "hackersnslackers" ["hackers" "slackers"]))
   (is (= (quote ("Alan Kay" "Richard Stallman" "Yukihiro Matsumoto"))
-         (redis/with-connection c (redis/zrange "hackers" "2" "4")))))
+         (redis/with-connection c (redis/zrange "hackers" "2" "4"))))
+  (is (= (quote ("Claude Shannon" "Alan Kay" "Richard Stallman" "Ferris Beuler"))
+         (redis/with-connection c (redis/zrange "hackersnslackers" "2" "5")))))
 
 (deftest test-dbsize
   (redis/with-connection c (redis/flushdb))
