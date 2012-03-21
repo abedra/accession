@@ -111,18 +111,34 @@
     (.setTcpNoDelay true)
     (.setKeepAlive true)))
 
+(def socket-atom (atom {}))
+
+(defn- socket-agent
+  [spec]
+  (when (not (@socket-atom spec))
+    (swap! socket-atom
+           (fn [hash]
+             (assoc hash
+               spec
+               (let [socket (doto (socket spec) (.setSoTimeout (:timeout spec)))
+                     in (DataInputStream. (BufferedInputStream. (.getInputStream socket)))
+                     out (.getOutputStream socket)]
+                 (agent [in out]))))))
+  (@socket-atom spec))
+
 (defn request
   "Responsible for actually making the request to the Redis
   server. Sets the timeout on the socket if one was specified."
   [conn & query]
-  (with-open [socket (doto (socket conn)
-                       (.setSoTimeout (:timeout conn)))
-              in (DataInputStream. (BufferedInputStream. (.getInputStream socket)))
-              out (.getOutputStream socket)]
-    (.write out (.getBytes (apply str query)))
-    (if (next query)
-      (doall (repeatedly (count query) #(response in)))
-      (response in))))
+  (let [p (promise)]
+    (send (socket-agent conn)
+          (fn [[in out]]
+            (.write out (.getBytes (apply str query)))
+            (deliver p (if (next query)
+                         (doall (repeatedly (count query) #(response in)))
+                         (response in)))
+            [in out]))
+    @p))
 
 (defn receive-message
   "Used in conjunction with an open channel to handle messages that
