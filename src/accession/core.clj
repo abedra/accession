@@ -390,7 +390,6 @@
   (zcard            [key])
   (zcount           [key min max])
   (zincrby          [key increment member])
-  (zinterstore      [destination numkeys set1 set2])
   (zrange           [key start stop])
   (zrank            [member])
   (zrem             [key member & members])
@@ -398,6 +397,16 @@
   (zremrangebyscore [key min max])
   (zrevrank         [key member])
   (zscore           [key member])
-  (zunionstore      [destination numkeys set1 set2])
 
   (publish          [channel message]))
+
+(defn zinterstore
+  [dest-key source-keys & options]
+  (apply query "zinterstore" dest-key
+         (count source-keys) (concat source-keys options)))
+
+(defn zunionstore
+  [dest-key source-keys & options]
+  (apply query "zunionstore" dest-key
+         (count source-keys) (concat source-keys options)))
+
