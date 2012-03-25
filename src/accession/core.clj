@@ -25,7 +25,7 @@
       ...
       $<number of bytes of argument N> CR LF
       <argument data> CR LF
-   
+
   See the following example:
 
       *3
@@ -102,7 +102,7 @@
   (let [length (Integer/parseInt (.readLine in))]
     (doall (repeatedly length #(response in)))))
 
-(defn- socket 
+(defn- socket
   "Creates an initial socket for consumption attached to the proper
   host and port. This socket is subject to modification later depending
   on the request use case or if a timeout is set."
@@ -247,11 +247,11 @@
 ;; A call to:
 ;;
 ;; <pre><code>(defqueries (set [key value]))</code></pre>
-;;     
+;;
 ;; will expand to:
 ;;
 ;; <pre><code>(do (defn set [key value] (query "set" key value)))</pre></code>
-;; 
+;;
 
 (defmacro defqueries
   "Given any number of redis commands and argument lists, convert them
@@ -299,7 +299,7 @@
   (monitor          [])
   (multi            [])
   (object           [subcommand & arguments])
-  
+
   (set              [key value])
   (setex            [key seconds value])
   (setnx            [key value])
@@ -366,7 +366,7 @@
   (hkeys            [key])
   (hvals            [key])
   (hlen             [key])
-  
+
   (sadd             [key member & members])
   (srem             [key member & members])
   (sismember        [key member])
