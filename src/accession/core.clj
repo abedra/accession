@@ -111,18 +111,59 @@
     (.setTcpNoDelay true)
     (.setKeepAlive true)))
 
+(defn- socket-and-streams
+  [spec]
+  (let [socket (doto (socket spec) (.setSoTimeout (:timeout spec)))
+        in (DataInputStream. (BufferedInputStream. (.getInputStream socket)))
+        out (.getOutputStream socket)]
+    [socket in out spec]))
+
+(defn- close-socket-and-streams
+  [[socket in out _]]
+  (.close socket) (.close in) (.close out))
+
+(def socket-atom (atom {}))
+
+(defn reset-sockets! []
+  (swap! socket-atom (fn [hash]
+                       (doseq [s-and-s (map deref (vals hash))]
+                         (close-socket-and-streams s-and-s))
+                       {})))
+
+(defn- socket-agent
+  [spec]
+  (when (not (@socket-atom spec))
+    (swap! socket-atom #(assoc % spec (agent (socket-and-streams spec)))))
+  (@socket-atom spec))
+
 (defn request
   "Responsible for actually making the request to the Redis
-  server. Sets the timeout on the socket if one was specified."
+  server. Sets the timeout on the socket if one was specified.
+
+Uses a long lived open socket owned by an agent to execute the request.
+If the socket throws an exception reading or writing, close it and start
+a new one but do not retry the query.
+
+Throwables thrown in the agent will be manually rethrown in the caller
+thread."
   [conn & query]
-  (with-open [socket (doto (socket conn)
-                       (.setSoTimeout (:timeout conn)))
-              in (DataInputStream. (BufferedInputStream. (.getInputStream socket)))
-              out (.getOutputStream socket)]
-    (.write out (.getBytes (apply str query)))
-    (if (next query)
-      (doall (repeatedly (count query) #(response in)))
-      (response in))))
+  (let [p (promise)]
+    (send (socket-agent conn)
+          (fn [[socket in out spec :as s-and-s]]
+            (try
+              (.write out (.getBytes (apply str query)))
+              (deliver p (if (next query)
+                           (doall (repeatedly (count query) #(response in)))
+                           (response in)))
+              s-and-s
+              (catch Throwable e
+                (deliver p e) (close-socket-and-streams s-and-s)
+                (socket-and-streams spec)))))
+    (let [result (deref p)]
+      ;; this seems potentially slow due to reflection - benchmark, maybe use protocol
+      (if (instance? Throwable result)
+        (throw result)
+        result))))
 
 (defn receive-message
   "Used in conjunction with an open channel to handle messages that

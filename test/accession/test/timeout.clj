@@ -9,7 +9,7 @@
     (if-let [request (.readLine rdr)]
       (do
         (with-open [os (.getOutputStream conn)]
-          (do (Thread/sleep 1000)
+          (do (Thread/sleep 500)
               (.write os (.getBytes "*3\r\n$3\r\none\r\n$3\r\ntwo\r\n$5\r\nthree\r\n"))
               (.flush os)
               (.close conn)))))))
@@ -28,13 +28,25 @@
 (defn stop-server [server]
   (.close (:socket server)))
 
-#_(deftest test-timeout
+(deftest test-timeout
+  (redis/reset-sockets!)
   (let [server (start-server)
         conn (redis/connection-map {:port 9000})]
     (do (is (= (redis/with-connection conn (redis/get "foo")) ["one" "two" "three"]))
         (stop-server server)))
   (let [server (start-server)
-        conn (redis/connection-map {:port 9000 :timeout 500})]
+        conn (redis/connection-map {:port 9000 :timeout 100})]
     (do (is (thrown? Exception
                      (redis/with-connection conn (redis/get "foo"))))
         (stop-server server))))
+
+(deftest test-socket-failure
+  (redis/reset-sockets!)
+  (let [server (start-server)
+        conn (redis/connection-map {:port 9000})]
+    (do (is (= (redis/with-connection conn (redis/get "foo")) ["one" "two" "three"]))
+        (stop-server server)
+        (is (thrown? Exception (redis/with-connection conn (redis/get "foo"))))
+        (let [server (start-server)]
+          (is (= (redis/with-connection conn (redis/get "foo")) ["one" "two" "three"]))
+          (stop-server server)))))
