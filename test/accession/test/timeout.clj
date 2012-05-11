@@ -1,8 +1,8 @@
 (ns accession.test.timeout
   (:use clojure.test)
   (:require [accession.core :as redis])
-  (:import (java.net ServerSocket)
-           (java.io InputStreamReader BufferedReader)))
+  (:import [java.net ServerSocket]
+           [java.io InputStreamReader BufferedReader]))
 
 (defn handle-connection [conn]
   (let [rdr (BufferedReader. (InputStreamReader. (.getInputStream conn)))]
@@ -28,13 +28,15 @@
 (defn stop-server [server]
   (.close (:socket server)))
 
-#_(deftest test-timeout
+(deftest test-timeout
   (let [server (start-server)
-        conn (redis/connection-map {:port 9000})]
-    (do (is (= (redis/with-connection conn (redis/get "foo")) ["one" "two" "three"]))
+        p (redis/make-connection-pool)
+        s (redis/make-connection-spec :port 9000)]
+    (do (is (= (redis/with-connection p s (redis/get "foo")) ["one" "two" "three"]))
         (stop-server server)))
   (let [server (start-server)
-        conn (redis/connection-map {:port 9000 :timeout 500})]
+        p (redis/make-connection-pool)
+        s (redis/make-connection-spec :port 9000 :timeout 500)]
     (do (is (thrown? Exception
-                     (redis/with-connection conn (redis/get "foo"))))
+                     (redis/with-connection p s (redis/get "foo"))))
         (stop-server server))))

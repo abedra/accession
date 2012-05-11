@@ -1,9 +1,20 @@
 #+TODO: TODO IN-PROGRESS REVIEW DONE
+* Docs
+** IN-PROGRESS Update readme for new pooled-connection API.
 * Response Processing
-** TODO Return proper values for ints, true, and false
+** TODO Return proper values for ints, true, and false?
+** TODO Return something better for errors?
+Currently just returns an "ERR ..." string. Better to throw an exception?
+Something else?
+** TODO Perhaps a thin interface for prn or deep-freeze serialization?
 * API
-** REVIEW Create a macro that allows for command creation
-*** Commands with varargs don't work
-** IN-PROGRESS Create a representation of every command offered in redis
+** TODO Need a way to test connections for life after entering subscription mode.
+   See discussion: https://github.com/antirez/redis/issues/420
+   And what to do when a dropped connection is detected? Remember that
+   subscriptions, etc. are attached to a specific connection - i.e. we'd need
+   to re-subscribe, etc.
+** TODO Create a representation of every command offered in redis.
+** TODO Parsed sort command (see redis-clojure).
 * Tests
-** IN-PROGRESS Create a small test for each of the redis commands to demonstrate that they work as expected
+** IN-PROGRESS Create a small test for each of the redis commands to demonstrate that they work as expected.
+** TODO return-bytes, sort, script commands
