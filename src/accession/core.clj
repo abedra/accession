@@ -355,7 +355,6 @@
   (watch            [key & keys])
   (unwatch          [])
   (del              [key & keys])
-  (sort             [key & options])
 
   (incr             [key])
   (incrby           [key increment])
@@ -454,7 +453,41 @@
   (apply query "zunionstore" dest-key
          (count source-keys) (concat source-keys options)))
 
-;; (defn sort) ; TODO Bring in from redis-clojure
+;; Sort stuff adapted from redis-clojure
+(defn- parse-sort-args [args]
+  (loop [out [] remaining-args (seq args)]
+    (if-not remaining-args
+      out
+      (let [[type & args] remaining-args]
+        (case type
+          :by (let [[pattern & rest] args]
+                (recur (conj out "BY" pattern) rest))
+          :limit (let [[offset count & rest] args]
+                   (recur (conj out "LIMIT" offset count) rest))
+          :get (let [[pattern & rest] args]
+                 (recur (conj out "GET" pattern) rest))
+          :mget (let [[patterns & rest] args]
+                  (recur (into out (interleave (repeat "GET")
+                                               patterns)) rest))
+          :store (let [[dest & rest] args]
+                   (recur (conj out "STORE" dest) rest))
+          :alpha (recur (conj out "ALPHA") args)
+          :asc   (recur (conj out "ASC")   args)
+          :desc  (recur (conj out "DESC")  args)
+          (throw (Exception. (str "Unknown sort argument: " type))))))))
+
+(defn sort
+  "Possible arguments are:
+  :by pattern
+  :limit offset count
+  :get pattern
+  :mget patterns
+  :store destination
+  :alpha
+  :asc
+  :desc"
+  [key & sort-args]
+  (apply query "sort" key (parse-sort-args sort-args)))
 
 ;;;; Pub/sub
 
