@@ -1,245 +1,216 @@
 (ns accession.test.core
-  (:use clojure.test)
+  (:use [clojure.test])
   (:require [accession.core :as redis]))
 
-(def c (redis/connection-map))
+(def p (redis/make-connection-pool))
+(def s (redis/make-connection-spec))
+(defmacro wq [& queries] `(redis/with-connection p s ~@queries))
 
-(redis/with-connection c (redis/flushall))
+(wq (redis/flushall)) ; Start with fresh db
 
 (deftest test-command-construction
-  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (redis/query "set" "foo" "bar")))
-  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar\r\n" (redis/query "get" "bar"))))
+  (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar"
+         (#'redis/query "set" "foo" "bar")))
+  (is (= "*2\r\n$3\r\nGET\r\n$3\r\nbar" (#'redis/query "get" "bar"))))
 
 (deftest test-echo
-  (is (= "Message" (redis/with-connection c (redis/echo "Message"))))
-  (is (= "PONG" (redis/with-connection c (redis/ping)))))
+  (is (= "Message" (wq (redis/echo "Message"))))
+  (is (= "PONG" (wq (redis/ping)))))
 
 (deftest test-exists
-  (is (= 0 (redis/with-connection c (redis/exists "singularity"))))
-  (redis/with-connection c (redis/set "singularity" "exists"))
-  (is (= 1 (redis/with-connection c (redis/exists "singularity")))))
+  (is (= 0 (wq (redis/exists "singularity"))))
+  (wq (redis/set "singularity" "exists"))
+  (is (= 1 (wq (redis/exists "singularity")))))
 
 (deftest test-keys
-  (is (= (quote ("resource:lock" "singularity"))
-         (redis/with-connection c (redis/keys "*")))))
+  (is (= '("resource:lock" "singularity") (wq (redis/keys "*")))))
 
 (deftest test-set-get
-  (is (= "OK"
-         (redis/with-connection c (redis/set "server:name" "fido"))))
-  (is (= "fido"
-         (redis/with-connection c (redis/get "server:name"))))
-  (is (= 15
-         (redis/with-connection c (redis/append "server:name" " [shutdown]"))))
-  (is (= "fido [shutdown]"
-         (redis/with-connection c (redis/getset "server:name" "fido [running]"))))
-  (is (= "running"
-         (redis/with-connection c (redis/getrange "server:name" "6" "12"))))
-  (redis/with-connection c (redis/setbit "mykey" "7" "1"))
-  (is (= 1
-         (redis/with-connection c (redis/getbit "mykey" "7"))))
-  (is (= "OK"
-         (redis/with-connection c (redis/set "multiline" "Redis\r\nDemo"))))
-  (is (= "Redis\r\nDemo"
-         (redis/with-connection c (redis/get "multiline")))))
+  (is (= "OK" (wq (redis/set "server:name" "fido"))))
+  (is (= "fido" (wq (redis/get "server:name"))))
+  (is (= 15 (wq (redis/append "server:name" " [shutdown]"))))
+  (is (= "fido [shutdown]" (wq (redis/getset "server:name" "fido [running]"))))
+  (is (= "running" (wq (redis/getrange "server:name" "6" "12"))))
+  (wq (redis/setbit "mykey" "7" "1"))
+  (is (= 1 (wq (redis/getbit "mykey" "7"))))
+  (is (= "OK" (wq (redis/set "multiline" "Redis\r\nDemo"))))
+  (is (= "Redis\r\nDemo" (wq (redis/get "multiline")))))
 
 (deftest test-incr-decr
-  (redis/with-connection c (redis/set "connections" "10"))
-  (is (= 11
-         (redis/with-connection c (redis/incr "connections"))))
-  (is (= 20
-         (redis/with-connection c (redis/incrby "connections" "9"))))
-  (is (= 19
-         (redis/with-connection c (redis/decr "connections"))))
-  (is (= 10
-         (redis/with-connection c (redis/decrby "connections" "9")))))
+  (wq (redis/set "connections" "10"))
+  (is (= 11 (wq (redis/incr "connections"))))
+  (is (= 20 (wq (redis/incrby "connections" "9"))))
+  (is (= 19 (wq (redis/decr "connections"))))
+  (is (= 10 (wq (redis/decrby "connections" "9")))))
 
 (deftest test-del
-  (redis/with-connection c (redis/set "something" "foo"))
-  (is (= 1
-         (redis/with-connection c (redis/del "something")))))
+  (wq (redis/set "something" "foo"))
+  (is (= 1 (wq (redis/del "something")))))
 
 (deftest test-expiry
-  (redis/with-connection c (redis/set "resource:lock" "Redis Demo"))
-  (is (= 1
-         (redis/with-connection c (redis/expire "resource:lock" "120"))))
-  (is (< 0
-         (redis/with-connection c (redis/ttl "resource:lock"))))
-  (is (= -1
-         (redis/with-connection c (redis/ttl "count")))))
+  (wq (redis/set "resource:lock" "Redis Demo"))
+  (is (= 1 (wq (redis/expire "resource:lock" "120"))))
+  (is (< 0 (wq (redis/ttl "resource:lock"))))
+  (is (= -1 (wq (redis/ttl "count")))))
 
 (deftest test-lists
-  (redis/with-connection c (redis/rpush "friends" "Tom"))
-  (redis/with-connection c (redis/rpush "friends" "Bob"))
-  (redis/with-connection c (redis/lpush "friends" "Sam"))
-  (is (= (quote ("Sam" "Tom" "Bob"))
-         (redis/with-connection c (redis/lrange "friends" "0" "-1"))))
-  (is (= (quote ("Sam" "Tom"))
-         (redis/with-connection c (redis/lrange "friends" "0" "1"))))
-  (is (= (quote ("Sam" "Tom" "Bob"))
-         (redis/with-connection c (redis/lrange "friends" "0" "2"))))
-  (is (= 3
-         (redis/with-connection c (redis/llen "friends"))))
-  (is (= "Sam"
-         (redis/with-connection c (redis/lpop "friends"))))
-  (is (= "Bob"
-         (redis/with-connection c (redis/rpop "friends"))))
-  (is (= 1
-         (redis/with-connection c (redis/llen "friends"))))
-  (is (= (quote ("Tom"))
-         (redis/with-connection c (redis/lrange "friends" "0" "-1"))))
-  (redis/with-connection c (redis/del "friends")))
+  (wq (redis/rpush "friends" "Tom"))
+  (wq (redis/rpush "friends" "Bob"))
+  (wq (redis/lpush "friends" "Sam"))
+  (is (= '("Sam" "Tom" "Bob")
+         (wq (redis/lrange "friends" "0" "-1"))))
+  (is (= '("Sam" "Tom")
+         (wq (redis/lrange "friends" "0" "1"))))
+  (is (= '("Sam" "Tom" "Bob")
+         (wq (redis/lrange "friends" "0" "2"))))
+  (is (= 3 (wq (redis/llen "friends"))))
+  (is (= "Sam" (wq (redis/lpop "friends"))))
+  (is (= "Bob" (wq (redis/rpop "friends"))))
+  (is (= 1 (wq (redis/llen "friends"))))
+  (is (= '("Tom") (wq (redis/lrange "friends" "0" "-1"))))
+  (wq (redis/del "friends")))
 
 (deftest test-non-ascii-params
-  (is (= "OK"
-         (redis/with-connection c (redis/set "spanish" "year->año"))))
-  (is (= "year->año"
-         (redis/with-connection c (redis/get "spanish")))))
+  (is (= "OK" (wq (redis/set "spanish" "year->año"))))
+  (is (= "year->año" (wq (redis/get "spanish")))))
 
 (deftest test-non-string-params
-  (is (= "OK"
-         (redis/with-connection c (redis/set "statement" "I am doing well"))))
-  (is (= "doing well"
-         (redis/with-connection c (redis/getrange "statement" 5 14))))
-  (redis/with-connection c
-    (redis/rpush "alist" "A")
-    (redis/rpush "alist" "B")
-    (redis/lpush "alist" "C"))
+  (is (= "OK" (wq (redis/set "statement" "I am doing well"))))
+  (is (= "doing well" (wq (redis/getrange "statement" 5 14))))
+  (wq (redis/rpush "alist" "A")
+      (redis/rpush "alist" "B")
+      (redis/lpush "alist" "C"))
   (is (= ["A" "B"]) (redis/lrange "alist" 0 2)))
 
+(deftest test-malformed-requests
+  (is (thrown? Exception (wq "This is an invalid request"))))
+
 (deftest test-hashes
-  (redis/with-connection c (redis/hset "myhash" "field1" "value1"))
-  (is (= "value1"
-         (redis/with-connection c (redis/hget "myhash" "field1"))))
-  (redis/with-connection c (redis/hsetnx "myhash" "field1" "newvalue"))
-  (is (= "value1"
-         (redis/with-connection c (redis/hget "myhash" "field1"))))
-  (is (= 1
-         (redis/with-connection c (redis/hexists "myhash" "field1"))))
-  (is (= (quote ("field1" "value1"))
-         (redis/with-connection c (redis/hgetall "myhash"))))
-  (redis/with-connection c (redis/hset "myhash" "field2" "1"))
-  (is (= 3
-         (redis/with-connection c (redis/hincrby "myhash" "field2" "2"))))
-  (is (= (quote ("field1" "field2"))
-         (redis/with-connection c (redis/hkeys "myhash"))))
-  (is (= (quote ("value1" "3"))
-         (redis/with-connection c (redis/hvals "myhash"))))
-  (is (= 2
-         (redis/with-connection c (redis/hlen "myhash"))))
-  (redis/with-connection c (redis/hdel "myhash" "field1"))
-  (is (= 0
-         (redis/with-connection c (redis/hexists "myhash" "field1")))))
+  (wq (redis/hset "myhash" "field1" "value1"))
+  (is (= "value1" (wq (redis/hget "myhash" "field1"))))
+  (wq (redis/hsetnx "myhash" "field1" "newvalue"))
+  (is (= "value1" (wq (redis/hget "myhash" "field1"))))
+  (is (= 1 (wq (redis/hexists "myhash" "field1"))))
+  (is (= '("field1" "value1") (wq (redis/hgetall "myhash"))))
+  (wq (redis/hset "myhash" "field2" "1"))
+  (is (= 3 (wq (redis/hincrby "myhash" "field2" "2"))))
+  (is (= '("field1" "field2") (wq (redis/hkeys "myhash"))))
+  (is (= '("value1" "3") (wq (redis/hvals "myhash"))))
+  (is (= 2 (wq (redis/hlen "myhash"))))
+  (wq (redis/hdel "myhash" "field1"))
+  (is (= 0 (wq (redis/hexists "myhash" "field1")))))
 
 (deftest test-sets
-  (redis/with-connection c (redis/sadd "superpowers" "flight"))
-  (redis/with-connection c (redis/sadd "superpowers" "x-ray vision"))
-  (redis/with-connection c (redis/sadd "superpowers" "reflexes"))
-  (redis/with-connection c (redis/srem "superpowers" "reflexes"))
-  (is (= 1
-         (redis/with-connection c (redis/sismember "superpowers" "flight"))))
-  (is (= 0
-         (redis/with-connection c (redis/sismember "superpowers" "reflexes"))))
-  (redis/with-connection c (redis/sadd "birdpowers" "pecking"))
-  (redis/with-connection c (redis/sadd "birdpowers" "flight"))
-  (is (= (quote ("pecking" "x-ray vision" "flight"))
-         (redis/with-connection c (redis/sunion "superpowers" "birdpowers")))))
+  (wq (redis/sadd "superpowers" "flight"))
+  (wq (redis/sadd "superpowers" "x-ray vision"))
+  (wq (redis/sadd "superpowers" "reflexes"))
+  (wq (redis/srem "superpowers" "reflexes"))
+  (is (= 1 (wq (redis/sismember "superpowers" "flight"))))
+  (is (= 0 (wq (redis/sismember "superpowers" "reflexes"))))
+  (wq (redis/sadd "birdpowers" "pecking"))
+  (wq (redis/sadd "birdpowers" "flight"))
+  (is (= '("pecking" "x-ray vision" "flight")
+         (wq (redis/sunion "superpowers" "birdpowers")))))
 
 (deftest test-sorted-sets
-  (redis/with-connection c (redis/zadd "hackers" "1940" "Alan Kay"))
-  (redis/with-connection c (redis/zadd "hackers" "1953" "Richard Stallman"))
-  (redis/with-connection c (redis/zadd "hackers" "1965" "Yukihiro Matsumoto"))
-  (redis/with-connection c (redis/zadd "hackers" "1916" "Claude Shannon"))
-  (redis/with-connection c (redis/zadd "hackers" "1969" "Linus Torvalds"))
-  (redis/with-connection c (redis/zadd "hackers" "1912" "Alan Turing"))
-  (redis/with-connection c (redis/zadd "hackers" "1972" "Dade Murphy"))
-  (redis/with-connection c (redis/zadd "hackers" "1970" "Emmanuel Goldstein"))
-  (redis/with-connection c (redis/zadd "slackers" "1968" "Pauly Shore"))
-  (redis/with-connection c (redis/zadd "slackers" "1972" "Dade Murphy"))
-  (redis/with-connection c (redis/zadd "slackers" "1970" "Emmanuel Goldstein"))
-  (redis/with-connection c (redis/zadd "slackers" "1966" "Adam Sandler"))
-  (redis/with-connection c (redis/zadd "slackers" "1962" "Ferris Beuler"))
-  (redis/with-connection c (redis/zadd "slackers" "1871" "Theodore Dreiser"))
-  (redis/with-connection c (redis/zunionstore "hackersnslackers" ["hackers" "slackers"]))
-  (redis/with-connection c (redis/zinterstore "hackerslackers" ["hackers" "slackers"]))
-  (is (= (quote ("Alan Kay" "Richard Stallman" "Yukihiro Matsumoto"))
-         (redis/with-connection c (redis/zrange "hackers" "2" "4"))))
-  (is (= (quote ("Claude Shannon" "Alan Kay" "Richard Stallman" "Ferris Beuler"))
-         (redis/with-connection c (redis/zrange "hackersnslackers" "2" "5"))))
-  (is (= (quote ("Emmanuel Goldstein" "Dade Murphy"))
-         (redis/with-connection c (redis/zrange "hackerslackers" "0" "1")))))
+  (wq (redis/zadd "hackers" "1940" "Alan Kay"))
+  (wq (redis/zadd "hackers" "1953" "Richard Stallman"))
+  (wq (redis/zadd "hackers" "1965" "Yukihiro Matsumoto"))
+  (wq (redis/zadd "hackers" "1916" "Claude Shannon"))
+  (wq (redis/zadd "hackers" "1969" "Linus Torvalds"))
+  (wq (redis/zadd "hackers" "1912" "Alan Turing"))
+  (wq (redis/zadd "hackers" "1972" "Dade Murphy"))
+  (wq (redis/zadd "hackers" "1970" "Emmanuel Goldstein"))
+  (wq (redis/zadd "slackers" "1968" "Pauly Shore"))
+  (wq (redis/zadd "slackers" "1972" "Dade Murphy"))
+  (wq (redis/zadd "slackers" "1970" "Emmanuel Goldstein"))
+  (wq (redis/zadd "slackers" "1966" "Adam Sandler"))
+  (wq (redis/zadd "slackers" "1962" "Ferris Beuler"))
+  (wq (redis/zadd "slackers" "1871" "Theodore Dreiser"))
+  (wq (redis/zunionstore "hackersnslackers" ["hackers" "slackers"]))
+  (wq (redis/zinterstore "hackerslackers" ["hackers" "slackers"]))
+  (is (= '("Alan Kay" "Richard Stallman" "Yukihiro Matsumoto")
+         (wq (redis/zrange "hackers" "2" "4"))))
+  (is (= '("Claude Shannon" "Alan Kay" "Richard Stallman" "Ferris Beuler")
+         (wq (redis/zrange "hackersnslackers" "2" "5"))))
+  (is (= '("Emmanuel Goldstein" "Dade Murphy")
+         (wq (redis/zrange "hackerslackers" "0" "1")))))
 
 (deftest test-dbsize
-  (redis/with-connection c (redis/flushdb))
-  (redis/with-connection c (redis/set "something" "with a value"))
-  (is (= 1
-         (redis/with-connection c (redis/dbsize))))
-  (redis/with-connection c (redis/flushall))
-  (is (= 0
-         (redis/with-connection c (redis/dbsize)))))
+  (wq (redis/flushdb))
+  (wq (redis/set "something" "with a value"))
+  (is (= 1 (wq (redis/dbsize))))
+  (wq (redis/flushall))
+  (is (= 0 (wq (redis/dbsize)))))
 
 (deftest test-pipeline
-  (redis/with-connection c
-    (redis/rpush "children" "A")
-    (redis/rpush "children" "B")
-    (redis/rpush "children" "C"))
-  (redis/with-connection c (redis/set "favorite:child" "B"))
-  (is (= ["B" "B"]
-         (redis/with-connection c
-           (redis/get "favorite:child")
-           (redis/get "favorite:child"))))
+  (wq (redis/rpush "children" "A")
+      (redis/rpush "children" "B")
+      (redis/rpush "children" "C"))
+  (wq (redis/set "favorite:child" "B"))
+  (is (= ["B" "B"] (wq (redis/get "favorite:child")
+                       (redis/get "favorite:child"))))
   (is (= ["B" ["A" "B" "C"] "B"]
-         (redis/with-connection c
-           (redis/get "favorite:child")
-           (redis/lrange "children" "0" "3")
-           (redis/get "favorite:child")))))
+         (wq (redis/get "favorite:child")
+             (redis/lrange "children" "0" "3")
+             (redis/get "favorite:child")))))
 
 (deftest test-pubsub
   (let [received (atom [])
-        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})]
-    (redis/with-connection c
-      (redis/publish "ps-foo" "one")
-      (redis/publish "ps-foo" "two")
-      (redis/publish "ps-foo" "three"))
+        listener (redis/make-listener
+                  s {"ps-foo" #(swap! received conj %)}
+                  (redis/subscribe "ps-foo"))]
+    (wq (redis/publish "ps-foo" "one")
+        (redis/publish "ps-foo" "two")
+        (redis/publish "ps-foo" "three"))
     (Thread/sleep 500)
-    (is (= @received [["subscribe" "ps-foo" 1]
-                      ["message" "ps-foo" "one"]
-                      ["message" "ps-foo" "two"]
-                      ["message" "ps-foo" "three"]]))
-    (redis/close channel))
+    (redis/close-listener listener)
+    (is (= @received ['("subscribe" "ps-foo" 1)
+                      '("message"   "ps-foo" "one")
+                      '("message"   "ps-foo" "two")
+                      '("message"   "ps-foo" "three")])))
 
   (let [received (atom [])
-        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})
-        _ (redis/subscribe channel {"ps-baz" #(swap! received conj %)})]
-    (redis/with-connection c
-      (redis/publish "ps-foo" "one")
-      (redis/publish "ps-bar" "two")
-      (redis/publish "ps-baz" "three"))
+        listener (redis/make-listener
+                  s {"ps-foo" #(swap! received conj %)
+                     "ps-baz" #(swap! received conj %)}
+                  (redis/subscribe "ps-foo" "ps-baz"))]
+    (wq (redis/publish "ps-foo" "one")
+        (redis/publish "ps-bar" "two")
+        (redis/publish "ps-baz" "three"))
     (Thread/sleep 500)
-    (is (= @received [["subscribe" "ps-foo" 1]
-                      ["subscribe" "ps-baz" 2]
-                      ["message" "ps-foo" "one"]
-                      ["message" "ps-baz" "three"]]))
-    (redis/close channel))
+    (redis/close-listener listener)
+    (is (= @received ['("subscribe" "ps-foo" 1)
+                      '("subscribe" "ps-baz" 2)
+                      '("message"   "ps-foo" "one")
+                      '("message"   "ps-baz" "three")])))
 
   (let [received (atom [])
-        channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})
-        _ (redis/subscribe channel {"ps-baz" #(swap! received conj %)})]
-    (redis/with-connection c
-      (redis/publish "ps-foo" "one")
-      (redis/publish "ps-bar" "two")
-      (redis/publish "ps-baz" "three"))
+        listener (redis/make-listener
+                  s {"ps-*"   #(swap! received conj %)
+                     "ps-foo" #(swap! received conj %)})
+        _ (redis/with-open-listener listener
+            (redis/psubscribe "ps-*")
+            (redis/subscribe  "ps-foo"))]
+    (wq (redis/publish "ps-foo" "one")
+        (redis/publish "ps-bar" "two")
+        (redis/publish "ps-baz" "three"))
     (Thread/sleep 500)
-    (redis/unsubscribe channel "ps-foo")
+    (redis/with-open-listener listener
+      (redis/unsubscribe "ps-foo"))
     (Thread/sleep 500)
-    (redis/with-connection c
-      (redis/publish "ps-foo" "four")
-      (redis/publish "ps-baz" "five"))
+    (wq (redis/publish "ps-foo" "four")
+        (redis/publish "ps-baz" "five"))
     (Thread/sleep 500)
-    (is (= @received [["subscribe" "ps-foo" 1]
-                      ["subscribe" "ps-baz" 2]
-                      ["message" "ps-foo" "one"]
-                      ["message" "ps-baz" "three"]
-                      ["message" "ps-baz" "five"]]))
-    (redis/close channel)))
+    (redis/close-listener listener)
+    (is (= @received ['("psubscribe"  "ps-*"   1)
+                      '("subscribe"   "ps-foo" 2)
+                      '("message"     "ps-foo" "one")
+                      '("pmessage"    "ps-*"   "ps-foo" "one")
+                      '("pmessage"    "ps-*"   "ps-bar" "two")
+                      '("pmessage"    "ps-*"   "ps-baz" "three")
+                      '("unsubscribe" "ps-foo" 1)
+                      '("pmessage"    "ps-*"   "ps-foo" "four")
+                      '("pmessage"    "ps-*"   "ps-baz" "five")]))))
 
-(redis/with-connection c (redis/flushall))
+(wq (redis/flushall)) ; Leave with a fresh db
