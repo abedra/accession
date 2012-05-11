@@ -124,7 +124,7 @@
 
 ;;;; Redis network protocol
 
-(def ^:private ^String charset "UTF-8")
+(def ^:private ^:const ^String charset "UTF-8")
 
 (defn- query
   "Takes a Clojure form like '(set \"mykey\" \"myvalue\")' and returns the
@@ -489,6 +489,8 @@
 
   Listener's thread will close automatically when it's connection to Redis is
   closed."
+  ;; TODO Once https://github.com/antirez/redis/issues/420 is implemented, can
+  ;; add timed connection-alive check and auto-reconnect options.
   [connection-spec handlers & subscription-commands]
   (let [handlers-atom (atom handlers)
         conn (make-new-connection (assoc connection-spec
@@ -510,10 +512,13 @@
 
 (comment
 
-  ;;    Ref: +/- 48k SETs/s for redis-benchmark  -n 100000 -c 5
-  ;;         +/- 14k SETs/s for jedis-benchmark* -n 100000 -t 5 -c 5 -s 1
+  ;;    Ref: +/- 48k SETs/s for redis-benchmark  -n 100k -c 5
+  ;;         +/- 14k SETs/s for jedis-benchmark* -n 100k -t 5 -c 5 -s 1
+  ;;         +/- 28k SETs/s for redis-clojure :requests 100k :clients 5
   ;; Result: +/- 33k SETs/s for accession
-  ;;  Notes: +/- 400ms spent generating query, cmp #=(command ...)
+  ;;  Notes: +/- 10-15% time spent generating query, cmp #=(command ...)
+  ;;             which leaves about 20% unaccounted-for impact relative to
+  ;;             redis-benchmark.
   ;;  * https://github.com/sheki/jedis-benchmark
 
   ;; TODO Doing something wrong? Why are the Jedis results so bad?
