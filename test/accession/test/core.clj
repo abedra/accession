@@ -4,7 +4,15 @@
 
 (def c (redis/connection-map))
 
-(redis/with-connection c (redis/flushall))
+(def keyset '("singularity" "server:name" "mykey" "multiline" "spanish"
+              "myhash" "statement" "birdpowers" "superpowers" "connections"
+              "alist"))
+
+(defn cleanup! []
+  (redis/with-connection c
+    (apply redis/del keyset)))
+
+(cleanup!)
 
 (deftest test-command-construction
   (is (= "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n" (redis/query "set" "foo" "bar")))
@@ -242,4 +250,4 @@
                       ["message" "ps-baz" "five"]]))
     (redis/close channel)))
 
-(redis/with-connection c (redis/flushall))
+(cleanup!)
