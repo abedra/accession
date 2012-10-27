@@ -20,8 +20,8 @@
   (is (= 1 (redis/with-connection c (redis/exists "singularity")))))
 
 (deftest test-keys
-  (is (= (quote ("resource:lock" "singularity"))
-         (redis/with-connection c (redis/keys "*")))))
+  (is (= (quote ("singularity"))
+         (redis/with-connection c (redis/keys "sing*")))))
 
 (deftest test-set-get
   (is (= "OK"
@@ -141,8 +141,8 @@
          (redis/with-connection c (redis/sismember "superpowers" "reflexes"))))
   (redis/with-connection c (redis/sadd "birdpowers" "pecking"))
   (redis/with-connection c (redis/sadd "birdpowers" "flight"))
-  (is (= (quote ("pecking" "x-ray vision" "flight"))
-         (redis/with-connection c (redis/sunion "superpowers" "birdpowers")))))
+  (is (= #{"pecking" "x-ray vision" "flight"}
+         (set (redis/with-connection c (redis/sunion "superpowers" "birdpowers"))))))
 
 (deftest test-sorted-sets
   (redis/with-connection c (redis/zadd "hackers" "1940" "Alan Kay"))
