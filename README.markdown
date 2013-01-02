@@ -6,13 +6,17 @@ A Clojure library for redis (current version 0.1.1)
 
 Simply add Accession to your leiningen project file:
 
-    [accession "0.1.1"]
+``` clojure
+[accession "0.1.1"]
+```
 
 #### But i'm using clojure 1.x because it is stable. I don't want to use 1.4-alpha2!
 
 That's ok. If you are using Clojure 1.2.1 or higher you shouldn't have any issues. You can tell leiningen not to pull 1.4.0-alpha2 into your project using the `:exclusions` feature:
 
-    [accession "0.1.1" :exclusions [org.clojure/clojure]]
+``` clojure
+[accession "0.1.1" :exclusions [org.clojure/clojure]]
+```
 
 ## Usage
    
@@ -22,42 +26,44 @@ of currently implemented commands see
 [core.clj](https://github.com/abedra/accession/blob/master/src/accession/core.clj). The
 example below demonstrates standard usage:
 
-    ;; Make sure to alias accession.core since several clojure.core
-    ;; functions are replaced
-    (require '[accession.core :as redis])
-     
-    ;; Create a connection map
-    (def c (redis/connection-map {}))
-     
-    ;; Use the connection to run commands against redis
-    (redis/with-connection c (redis/set "foo" "some value"))
-    -> "OK"
-    (redis/with-connection c (redis/get "foo"))
-    -> "some value"
-     
-    ;; When you run multiple queries, accession will assume
-    ;; pipelining. This behavior is subject to change.
-    (redis/with-connection c
-        (redis/rpush "children" "A")
-        (redis/rpush "children" "B")
-        (redis/rpush "children" "C"))
-    -> (1 2 3)
-	
-	;; You can use the Redis pub/sub features 
-	(def channel (redis/subscribe c {"bar" (fn [x] (prn x))}))
-	-> ("subscribe" "bar" 1)
-	
-	;; and afterwards add more consumers to the channel
-	(redis/subscribe channel {"baz" #(prn %)})
-	-> ("subscribe" "baz" 2)
-	
-	;; You can send messages like so
-	(redis/with-connection c (redis/publish "bar" "Hello bar") 
-	                         (redis/publish "baz" "Hello baz"))
-	-> ("message" "bar" "Hello bar")
-       ("message" "baz" "Hello baz")
-	
-	;; Again, this API is subject to change.
+``` clojure
+;; Make sure to alias accession.core since several clojure.core
+;; functions are replaced
+(require '[accession.core :as redis])
+ 
+;; Create a connection map
+(def c (redis/connection-map {}))
+ 
+;; Use the connection to run commands against redis
+(redis/with-connection c (redis/set "foo" "some value"))
+-> "OK"
+(redis/with-connection c (redis/get "foo"))
+-> "some value"
+ 
+;; When you run multiple queries, accession will assume
+;; pipelining. This behavior is subject to change.
+(redis/with-connection c
+    (redis/rpush "children" "A")
+    (redis/rpush "children" "B")
+    (redis/rpush "children" "C"))
+-> (1 2 3)
+
+;; You can use the Redis pub/sub features 
+(def channel (redis/subscribe c {"bar" (fn [x] (prn x))}))
+-> ("subscribe" "bar" 1)
+
+;; and afterwards add more consumers to the channel
+(redis/subscribe channel {"baz" #(prn %)})
+-> ("subscribe" "baz" 2)
+
+;; You can send messages like so
+(redis/with-connection c (redis/publish "bar" "Hello bar") 
+                         (redis/publish "baz" "Hello baz"))
+-> ("message" "bar" "Hello bar")
+   ("message" "baz" "Hello baz")
+
+;; Again, this API is subject to change.
+```
 
 This library is targeted at Redis 2.0+. If you are using an older
 version of Redis or are using a version of Clojure earlier than 1.3.0,
