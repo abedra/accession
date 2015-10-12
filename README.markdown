@@ -1,3 +1,5 @@
+## This project is no longer under active development
+
 # Accession [![Build Status](https://secure.travis-ci.org/abedra/accession.png)](http://travis-ci.org/abedra/accession?branch=master)
 
 A Clojure library for redis (current version 0.1.1)
