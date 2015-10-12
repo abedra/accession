@@ -201,6 +201,14 @@
            (redis/lrange "children" "0" "3")
            (redis/get "favorite:child")))))
 
+(deftest test-monitor
+  (let [received (atom (str))
+        monitor (redis/monitor c #(reset! received %))]
+    (redis/with-connection c
+      (redis/ping))
+    (is (= "PING" (re-find #"PING" @received)))
+    (redis/close monitor)))
+
 (deftest test-pubsub
   (let [received (atom [])
         channel (redis/subscribe c {"ps-foo" #(swap! received conj %)})]
